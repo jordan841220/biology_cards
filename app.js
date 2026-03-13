@@ -40,6 +40,30 @@ const TIER_STATS = {
   流感病毒: { attack: 3, health: 3, tags: ["特殊", "呼吸"] },
 };
 
+const CARD_GUIDE_TEXT = {
+  "腺嘌呤(A)": "做 DNA 用的零件。",
+  "胸腺嘧啶(T)": "做 DNA 用的零件。",
+  "胞嘧啶(C)": "做 DNA 用的零件。",
+  "鳥糞嘌呤(G)": "做 DNA 用的零件。",
+  "尿嘧啶(U)": "做 RNA 用的零件。",
+  胺基酸: "兩張胺基酸可做蛋白質。",
+  磷脂質: "兩張磷脂質可做細胞膜。",
+  DNA: "可用來做細胞核或粒線體。",
+  RNA: "可用來做核糖體、細胞核或神經細胞。",
+  蛋白質: "可用來做核糖體、細胞核或上皮細胞。",
+  細胞膜: "可用來做粒線體、真核細胞或肺泡細胞。",
+  核糖體: "真核細胞需要的四大零件之一。",
+  細胞核: "真核細胞需要的四大零件之一。",
+  粒線體: "真核細胞需要的四大零件之一，也能做心肌細胞。",
+  真核細胞: "可再升級成上皮、心肌、神經或肺泡細胞。",
+  上皮細胞: "本版的高階細胞之一。",
+  心肌細胞: "本版的高階細胞之一。",
+  神經細胞: "本版的高階細胞之一。",
+  肺泡細胞: "本版的高階細胞之一。",
+  大腸桿菌: "特殊卡，可直接部署到戰場。",
+  流感病毒: "特殊卡，可直接部署到戰場。",
+};
+
 const CARD_LIBRARY = {
   "腺嘌呤(A)": createMaterialCard("基礎分子"),
   "胸腺嘧啶(T)": createMaterialCard("基礎分子"),
@@ -227,6 +251,14 @@ const RECIPES = [
     text: "四大系統合成",
   },
 ];
+
+const PROTOTYPE_TIER_CAP = "細胞";
+const LAB_LIMIT = 8;
+const BATTLEFIELD_LIMIT = 3;
+const ACTIVE_RECIPES = RECIPES.filter(
+  (recipe) => TIER_ORDER[CARD_LIBRARY[recipe.output].tier] <= TIER_ORDER[PROTOTYPE_TIER_CAP]
+);
+const COACH_TARGETS = ["真核細胞", "上皮細胞", "心肌細胞", "神經細胞", "肺泡細胞"];
 
 const DECK_BLUEPRINT = {
   "腺嘌呤(A)": 2,
@@ -512,6 +544,10 @@ function playAllFreeMaterials(sideKey) {
     for (let index = 0; index < side.hand.length; index += 1) {
       const card = side.hand[index];
       if (card.category === "結構" && !card.isBattleCard && card.directPlayable) {
+        if (!ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          return;
+        }
+
         side.hand.splice(index, 1);
         side.lab.push(card);
         addLog(state, `${side.label} 將 ${card.name} 放入實驗區。`);
@@ -532,6 +568,13 @@ function playCard(sideKey, handIndex, options = {}) {
   }
 
   if (card.category === "結構" && !card.isBattleCard) {
+    if (!ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+      if (!options.silentRender) {
+        render();
+      }
+      return;
+    }
+
     side.hand.splice(handIndex, 1);
     side.lab.push(card);
     addLog(state, `${side.label} 將 ${card.name} 放入實驗區。`);
@@ -556,6 +599,15 @@ function playCard(sideKey, handIndex, options = {}) {
       render();
     }
     return;
+  }
+
+  if (card.category === "結構" && card.isBattleCard) {
+    if (!ensureZoneSpace(sideKey, "battlefield", side.battlefield.length + 1 - BATTLEFIELD_LIMIT)) {
+      if (!options.silentRender) {
+        render();
+      }
+      return;
+    }
   }
 
   side.energy -= cost;
@@ -706,7 +758,7 @@ function resolveSupportEffect(sideKey, enemy, card) {
 
 function applyOnSummonEffect(sideKey, enemy, card) {
   if (card.name === "大腸桿菌") {
-    const target = enemy.battlefield.find((item) => TIER_ORDER[item.tier] >= TIER_ORDER["組織"]);
+    const target = enemy.battlefield[0];
     if (target) {
       applyDamage(target, 1);
       addLog(state, `${card.name} 進場時感染 ${target.name}，造成 1 點傷害。`);
@@ -731,7 +783,7 @@ function getAvailableRecipes(sideKey) {
   const side = state.players[sideKey];
   const options = [];
 
-  RECIPES.forEach((recipe, recipeIndex) => {
+  ACTIVE_RECIPES.forEach((recipe, recipeIndex) => {
     const match = findRecipeMatch(side, recipe);
     if (!match) {
       return;
@@ -815,6 +867,22 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
     return;
   }
 
+  const result = createCard(selected.recipe.output);
+  const targetZone = result.isBattleCard ? "battlefield" : "lab";
+  const protectedIds = new Set(selected.match.map((card) => card.id));
+  const consumedFromTargetZone = selected.match.filter((card) =>
+    side[targetZone].some((item) => item.id === card.id)
+  ).length;
+  const targetLimit = targetZone === "battlefield" ? BATTLEFIELD_LIMIT : LAB_LIMIT;
+  const overflow = side[targetZone].length - consumedFromTargetZone + 1 - targetLimit;
+
+  if (!ensureZoneSpace(sideKey, targetZone, overflow, protectedIds)) {
+    if (!options.silentRender) {
+      render();
+    }
+    return;
+  }
+
   const cost = side.freeEvolution > 0 ? 0 : 1 + side.evolutionTax;
   side.energy -= cost;
   if (side.freeEvolution > 0) {
@@ -829,8 +897,6 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
     removeCardFromZones(side, card.id);
     side.discard.push(card);
   }
-
-  const result = createCard(selected.recipe.output);
 
   if (result.isBattleCard) {
     result.ready = false;
@@ -869,6 +935,24 @@ function removeCardFromZones(side, cardId) {
   }
 
   return null;
+}
+
+function discardZoneCard(sideKey, zone, cardId, options = {}) {
+  const side = state.players[sideKey];
+  const card = removeCardFromZones(side, cardId);
+
+  if (!card) {
+    return false;
+  }
+
+  side.discard.push(card);
+  addLog(state, `${side.label} 從 ${zone === "lab" ? "實驗區" : "戰場"} 丟棄 ${card.name}。`);
+
+  if (!options.silentRender) {
+    render();
+  }
+
+  return true;
 }
 
 function attackWithUnit(sideKey, cardId) {
@@ -969,6 +1053,110 @@ function chooseBestEvolution(sideKey) {
   return getAvailableRecipes(sideKey)[0] ?? null;
 }
 
+function getZoneLabel(zone) {
+  return zone === "lab" ? "實驗區" : "戰場";
+}
+
+function ensureZoneSpace(sideKey, zone, overflow, protectedIds = new Set()) {
+  if (overflow <= 0) {
+    return true;
+  }
+
+  const side = state.players[sideKey];
+
+  if (sideKey === "player") {
+    addLog(state, `${getZoneLabel(zone)} 已滿，請先丟棄 1 張卡再繼續。`);
+    return false;
+  }
+
+  for (let count = 0; count < overflow; count += 1) {
+    const removed = autoDiscardFromZone(sideKey, zone, protectedIds);
+    if (!removed) {
+      addLog(state, `${side.label} 的 ${getZoneLabel(zone)} 已滿，這次行動失敗。`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function autoDiscardFromZone(sideKey, zone, protectedIds = new Set()) {
+  const side = state.players[sideKey];
+  const zoneCards = side[zone].filter((card) => !protectedIds.has(card.id));
+  if (!zoneCards.length) {
+    return null;
+  }
+
+  let target = zoneCards[0];
+
+  if (zone === "battlefield") {
+    target = [...zoneCards].sort((left, right) => {
+      const leftScore = left.attack + left.health;
+      const rightScore = right.attack + right.health;
+      if (leftScore !== rightScore) {
+        return leftScore - rightScore;
+      }
+
+      return TIER_ORDER[left.tier] - TIER_ORDER[right.tier];
+    })[0];
+  }
+
+  removeCardFromZones(side, target.id);
+  side.discard.push(target);
+  addLog(state, `${side.label} 為了騰出 ${getZoneLabel(zone)}，自動丟棄 ${target.name}。`);
+  return target;
+}
+
+function analyzeRecipeProgress(side, recipe) {
+  const pool = [...side.lab, ...side.battlefield];
+  const usedIds = new Set();
+  const have = [];
+  const missing = [];
+
+  for (const input of recipe.inputs) {
+    const candidate = pool.find((card) => {
+      if (usedIds.has(card.id)) {
+        return false;
+      }
+
+      if (input === "任意一張 DNA 鹼基") {
+        return DNA_BASES.has(card.name);
+      }
+
+      return card.name === input;
+    });
+
+    if (candidate) {
+      usedIds.add(candidate.id);
+      have.push(candidate.name);
+    } else {
+      missing.push(input);
+    }
+  }
+
+  return {
+    recipe,
+    have,
+    missing,
+    ready: missing.length === 0,
+  };
+}
+
+function getCoachState(sideKey) {
+  const side = state.players[sideKey];
+  const progressByOutput = new Map();
+
+  for (const recipe of ACTIVE_RECIPES) {
+    const progress = analyzeRecipeProgress(side, recipe);
+    const current = progressByOutput.get(recipe.output);
+    if (!current || progress.missing.length < current.missing.length || progress.have.length > current.have.length) {
+      progressByOutput.set(recipe.output, progress);
+    }
+  }
+
+  return COACH_TARGETS.map((output) => progressByOutput.get(output)).filter(Boolean);
+}
+
 function findWeakestUnit(cards) {
   return [...cards].sort((left, right) => left.health - right.health)[0] ?? null;
 }
@@ -1014,6 +1202,22 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "discard-lab-card") {
+    if (state.activeSide !== "player") {
+      return;
+    }
+    discardZoneCard("player", "lab", event.target.dataset.cardId);
+    return;
+  }
+
+  if (action === "discard-battle-card") {
+    if (state.activeSide !== "player") {
+      return;
+    }
+    discardZoneCard("player", "battlefield", event.target.dataset.cardId);
+    return;
+  }
+
   if (action === "end-turn") {
     endPlayerTurn();
   }
@@ -1023,6 +1227,7 @@ function render() {
   const player = state.players.player;
   const ai = state.players.ai;
   const availableRecipes = getAvailableRecipes("player");
+  const coachState = getCoachState("player");
   const winnerLabel =
     state.winner === "player" ? "玩家勝利" : state.winner === "ai" ? "AI 勝利" : "對局進行中";
 
@@ -1048,18 +1253,82 @@ function render() {
         </div>
         <div class="prototype-note">
           <strong>Prototype 原則</strong><br />
-          這版先追求可玩，不先做完整平衡。高階結構必須透過進化產生，特殊卡可直接部署；數值目前只是測試節奏用 placeholder。
+          這版先追求可玩，不先做完整平衡。進化目前最高只到細胞層級；能量就是每回合會回滿的行動點，拿來打卡和進化。
         </div>
       </div>
     </section>
 
     <section class="section-grid">
       <div class="stack">
+        ${renderGuidePanel(coachState, availableRecipes)}
         ${renderSidePanel("AI 區域", ai, false)}
         ${renderEvolutionPanel(availableRecipes)}
         ${renderSidePanel("玩家區域", player, true)}
       </div>
       ${renderLogPanel()}
+    </section>
+  `;
+}
+
+function renderGuidePanel(coachState, availableRecipes) {
+  const readyOutputs = availableRecipes.map((item) => item.recipe.output);
+
+  return `
+    <section class="panel">
+      <div class="panel-inner">
+        <div class="panel-title">
+          <h3>進化提示</h3>
+          <span>本版最高到細胞</span>
+        </div>
+
+        <div class="guide-grid">
+          <div class="guide-block">
+            <strong>白話版流程</strong>
+            <div class="guide-text">把 <code>細胞膜</code> 想成外殼，<code>細胞核</code> 想成指揮中心，<code>核糖體</code> 想成工廠，<code>粒線體</code> 想成電池。四個湊齊後，就能做出 <code>真核細胞</code>。</div>
+            <div class="guide-text">接著用 <code>真核細胞 + 額外素材</code> 做專精細胞：蛋白質變上皮細胞、粒線體變心肌細胞、RNA 變神經細胞、細胞膜變肺泡細胞。</div>
+          </div>
+
+          <div class="guide-block">
+            <strong>能量與區域</strong>
+            <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或按下進化。</div>
+            <div class="guide-text">實驗區上限 ${LAB_LIMIT} 張，戰場上限 ${BATTLEFIELD_LIMIT} 張。區滿了就要先丟棄。</div>
+          </div>
+        </div>
+
+        <div class="guide-block">
+          <strong>核心配方</strong>
+          <div class="guide-recipes">
+            <span class="badge">核糖體 = RNA + 蛋白質</span>
+            <span class="badge">細胞核 = DNA + RNA + 蛋白質</span>
+            <span class="badge">粒線體 = 細胞膜 + DNA + 蛋白質</span>
+            <span class="badge">真核細胞 = 細胞膜 + 細胞核 + 核糖體 + 粒線體</span>
+          </div>
+        </div>
+
+        <div class="guide-block">
+          <strong>你現在最接近的進化</strong>
+          <div class="coach-list">
+            ${coachState
+              .map((item) => {
+                const ready = readyOutputs.includes(item.recipe.output);
+                const haveText = item.have.length ? `已有：${item.have.join("、")}` : "已有：還沒有關鍵材料";
+                const missingText = item.missing.length ? `還缺：${item.missing.join("、")}` : "已可直接進化";
+
+                return `
+                  <div class="coach-item">
+                    <div>
+                      <strong>${item.recipe.output}</strong>
+                      <div class="card-meta">${haveText}</div>
+                      <div class="card-meta">${missingText}</div>
+                    </div>
+                    <span class="badge ${ready ? "badge-accent" : ""}">${ready ? "現在可做" : "準備中"}</span>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -1084,16 +1353,16 @@ function renderSidePanel(title, side, isPlayer) {
         </div>
 
         <div class="zone">
-          <h3>戰場</h3>
+          <h3>戰場 ${side.battlefield.length} / ${BATTLEFIELD_LIMIT}</h3>
           <div class="card-row">
             ${side.battlefield.length ? side.battlefield.map((card) => renderBattleCard(card, isPlayer)).join("") : '<div class="empty">目前沒有戰鬥單位。</div>'}
           </div>
         </div>
 
         <div class="zone">
-          <h3>實驗區</h3>
+          <h3>實驗區 ${side.lab.length} / ${LAB_LIMIT}</h3>
           <div class="card-row">
-            ${side.lab.length ? side.lab.map(renderMaterialCard).join("") : '<div class="empty">目前沒有素材。</div>'}
+            ${side.lab.length ? side.lab.map((card) => renderMaterialCard(card, isPlayer)).join("") : '<div class="empty">目前沒有素材。</div>'}
           </div>
         </div>
 
@@ -1135,7 +1404,10 @@ function renderBattleCard(card, isPlayer) {
       <div class="card-actions">
         ${
           isPlayer
-            ? `<button class="tiny-button" data-action="attack" data-card-id="${card.id}" ${state.activeSide !== "player" || !card.ready || state.winner ? "disabled" : ""}>攻擊</button>`
+            ? `
+              <button class="tiny-button" data-action="attack" data-card-id="${card.id}" ${state.activeSide !== "player" || !card.ready || state.winner ? "disabled" : ""}>攻擊</button>
+              <button class="tiny-button" data-action="discard-battle-card" data-card-id="${card.id}" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>丟棄</button>
+            `
             : ""
         }
       </div>
@@ -1143,7 +1415,7 @@ function renderBattleCard(card, isPlayer) {
   `;
 }
 
-function renderMaterialCard(card) {
+function renderMaterialCard(card, isPlayer) {
   return `
     <article class="card card-material">
       <div class="card-header">
@@ -1155,6 +1427,12 @@ function renderMaterialCard(card) {
       <div class="badge-row">
         <span class="badge">${card.tier}</span>
       </div>
+      <div class="card-meta">${CARD_GUIDE_TEXT[card.name] ?? "可作為進化素材。"}</div>
+      ${
+        isPlayer
+          ? `<div class="card-actions"><button class="tiny-button" data-action="discard-lab-card" data-card-id="${card.id}" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>丟棄</button></div>`
+          : ""
+      }
     </article>
   `;
 }
@@ -1199,7 +1477,7 @@ function renderHandCard(card, index, isPlayer) {
       ${
         card.isBattleCard
           ? `<div class="card-stats"><span>攻擊 ${card.attack}</span><span>生命 ${card.health}</span></div>`
-          : `<div class="card-meta">${handCardHint(card)}</div>`
+          : `<div class="card-meta">${CARD_GUIDE_TEXT[card.name] ?? handCardHint(card)}</div>`
       }
       <div class="card-actions">
         <button class="tiny-button" data-action="play-card" data-index="${index}" ${disabled ? "disabled" : ""}>
@@ -1216,7 +1494,7 @@ function renderEvolutionPanel(recipes) {
       <div class="panel-inner">
         <div class="panel-title">
           <h3>可進化配方</h3>
-          <span>玩家能量 ${state.players.player.energy}</span>
+          <span>玩家能量 ${state.players.player.energy} / 3</span>
         </div>
         <div class="evolution-list">
           ${
