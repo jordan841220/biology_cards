@@ -102,13 +102,17 @@ const CARD_LIBRARY = {
   "PCR 儀": createSupportCard("物品", 1, "copy"),
   培養箱: createSupportCard("物品", 1, "shield"),
   "CRISPR 試劑組": createSupportCard("物品", 1, "cleanse"),
+  抗生素: createSupportCard("物品", 1, "antibiotic"),
   醫師: createSupportCard("角色", 1, "heal"),
-  生資工程師: createSupportCard("角色", 1, "insight"),
+  病理學家: createSupportCard("角色", 1, "pathology"),
   分子生物學家: createSupportCard("角色", 1, "freeEvolution"),
   細胞培養師: createSupportCard("角色", 1, "cellBoost"),
   癌症: createSupportCard("疾病", 1, "cancer"),
   流感: createSupportCard("疾病", 1, "flu"),
   遺傳性突變: createSupportCard("疾病", 1, "mutation"),
+  細胞凋亡: createSupportCard("疾病", 1, "apoptosis"),
+  訊號阻斷: createSupportCard("疾病", 1, "signalBlock"),
+  發炎反應: createSupportCard("疾病", 1, "inflammation"),
 };
 
 const RECIPES = [
@@ -246,8 +250,8 @@ const RECIPES = [
 
 const PROTOTYPE_TIER_CAP = "個體";
 const LAB_LIMIT = 8;
-const BATTLEFIELD_LIMIT = 3;
-const MATERIAL_PLAYS_PER_TURN = 2;
+const BATTLEFIELD_LIMIT = Number.POSITIVE_INFINITY;
+const MATERIAL_PLAYS_PER_TURN = 3;
 const EVOLUTIONS_PER_TURN = 1;
 const ACTIVE_RECIPES = RECIPES.filter(
   (recipe) => TIER_ORDER[CARD_LIBRARY[recipe.output].tier] <= TIER_ORDER[PROTOTYPE_TIER_CAP]
@@ -255,38 +259,35 @@ const ACTIVE_RECIPES = RECIPES.filter(
 const COACH_OUTPUT_LIMIT = 6;
 
 const DECK_BLUEPRINT = {
-  "腺嘌呤(A)": 2,
-  "胸腺嘧啶(T)": 2,
-  "胞嘧啶(C)": 2,
-  "鳥糞嘌呤(G)": 2,
-  "尿嘧啶(U)": 2,
-  胺基酸: 4,
-  磷脂質: 4,
-  DNA: 2,
-  RNA: 2,
-  蛋白質: 2,
-  細胞膜: 2,
-  細胞核: 1,
-  核糖體: 1,
-  粒線體: 1,
+  "腺嘌呤(A)": 3,
+  "胸腺嘧啶(T)": 3,
+  "胞嘧啶(C)": 3,
+  "鳥糞嘌呤(G)": 3,
+  "尿嘧啶(U)": 3,
+  胺基酸: 6,
+  磷脂質: 6,
   移液器: 2,
   離心機: 2,
   "PCR 儀": 1,
   培養箱: 1,
   "CRISPR 試劑組": 1,
+  抗生素: 2,
   醫師: 1,
-  生資工程師: 1,
+  病理學家: 2,
   分子生物學家: 1,
   細胞培養師: 1,
   癌症: 1,
   流感: 1,
   遺傳性突變: 1,
+  細胞凋亡: 2,
+  訊號阻斷: 2,
+  發炎反應: 1,
   大腸桿菌: 1,
   流感病毒: 1,
 };
 
-const STARTER_LAB = ["DNA", "RNA", "蛋白質", "細胞膜"];
-const INITIAL_HAND_SIZE = 5;
+const STARTER_LAB = [];
+const INITIAL_HAND_SIZE = 7;
 const STARTING_HP = 30;
 const STARTING_ENERGY = 3;
 const LOG_LIMIT = 14;
@@ -322,7 +323,7 @@ function createInitialState() {
     drawCards(side, INITIAL_HAND_SIZE, game);
   }
 
-  addLog(game, "遊戲開始。雙方都帶著 starter lab 進場，先驗證進化與對戰節奏。");
+  addLog(game, "遊戲開始。牌庫只會抽到基礎素材、效果牌與特殊卡，中間結構必須靠進化做出來。");
   beginTurn("player", game, { skipDraw: true });
   return game;
 }
@@ -381,6 +382,7 @@ function createCard(name) {
     ready: false,
     shield: 0,
     blockedEvolution: 0,
+    stunnedTurns: 0,
   };
 }
 
@@ -455,12 +457,17 @@ function beginTurn(sideKey, game, options = {}) {
   }
 
   for (const card of side.battlefield) {
-    if (card.health > 0) {
+    if (card.health > 0 && card.stunnedTurns <= 0) {
       card.ready = true;
     }
 
     if (card.blockedEvolution > 0) {
       card.blockedEvolution -= 1;
+    }
+
+    if (card.stunnedTurns > 0) {
+      card.ready = false;
+      card.stunnedTurns -= 1;
     }
   }
 
@@ -714,6 +721,19 @@ function resolveSupportEffect(sideKey, enemy, card) {
       }
       break;
     }
+    case "pathology": {
+      const target = findHighestTierUnit(enemy.battlefield);
+      if (target) {
+        const damage = target.health < target.maxHealth ? 4 : 2;
+        applyDamage(target, damage);
+        addLog(state, `${side.label} 使用 ${card.name}，分析後打擊 ${target.name}，造成 ${damage} 點傷害。`);
+        removeDeadUnits(enemy, side);
+      } else {
+        drawCards(side, 1, state);
+        addLog(state, `${side.label} 使用 ${card.name}，對手沒有戰場單位，改為抽 1 張。`);
+      }
+      break;
+    }
     case "freeEvolution": {
       side.freeEvolution += 1;
       addLog(state, `${side.label} 使用 ${card.name}，下一次進化不消耗能量。`);
@@ -760,6 +780,56 @@ function resolveSupportEffect(sideKey, enemy, card) {
       } else {
         enemy.evolutionTax += 1;
         addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 下一次進化多消耗 1 點能量。`);
+      }
+      break;
+    }
+    case "antibiotic": {
+      const target = enemy.battlefield.find((item) => item.tier === "特殊") || enemy.battlefield[0];
+      if (target) {
+        const damage = target.tier === "特殊" ? 3 : 2;
+        applyDamage(target, damage);
+        addLog(state, `${side.label} 使用 ${card.name}，對 ${target.name} 造成 ${damage} 點傷害。`);
+        removeDeadUnits(enemy, side);
+      } else {
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場為空。`);
+      }
+      break;
+    }
+    case "apoptosis": {
+      const target = findWeakestUnit(enemy.battlefield);
+      if (target) {
+        if (target.health <= 3) {
+          target.health = 0;
+          addLog(state, `${side.label} 使用 ${card.name}，直接誘發 ${target.name} 凋亡。`);
+        } else {
+          applyDamage(target, 2);
+          addLog(state, `${side.label} 使用 ${card.name}，對 ${target.name} 造成 2 點傷害。`);
+        }
+        removeDeadUnits(enemy, side);
+      } else {
+        addLog(state, `${side.label} 使用 ${card.name}，但沒有可凋亡的目標。`);
+      }
+      break;
+    }
+    case "signalBlock": {
+      const target = findHighestTierUnit(enemy.battlefield);
+      if (target) {
+        target.ready = false;
+        target.blockedEvolution = Math.max(target.blockedEvolution, 1);
+        target.stunnedTurns = Math.max(target.stunnedTurns, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，阻斷 ${target.name}，使其下回合無法攻擊並暫停進化。`);
+      } else {
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場為空。`);
+      }
+      break;
+    }
+    case "inflammation": {
+      if (enemy.battlefield.length) {
+        enemy.battlefield.forEach((target) => applyDamage(target, 1));
+        addLog(state, `${side.label} 使用 ${card.name}，對 ${enemy.label} 全體戰場單位各造成 1 點傷害。`);
+        removeDeadUnits(enemy, side);
+      } else {
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場為空。`);
       }
       break;
     }
@@ -924,7 +994,7 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
   }
 
   if (result.isBattleCard) {
-    result.ready = false;
+    result.ready = true;
     if (result.tier === "細胞" && side.nextCellShield > 0) {
       result.shield += side.nextCellShield;
       side.nextCellShield = 0;
@@ -1237,7 +1307,7 @@ function getTutorialState(sideKey, availableRecipes) {
   }
 
   if (!steps[0].done) {
-    nextMove = "先把手牌中的素材放進實驗區，但每回合只能放 2 張，所以要先選最需要的。";
+    nextMove = `先把手牌中的素材放進實驗區，但每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張，所以要先選最需要的。`;
   } else if (readyOutputs.includes("核糖體")) {
     nextMove = "你現在可以先做核糖體，它是所有細胞線都會用到的核心零件。";
   } else if (readyOutputs.includes("細胞核")) {
@@ -1366,7 +1436,7 @@ function render() {
         </div>
         <div class="prototype-note">
           <strong>Prototype 原則</strong><br />
-          這版重新拉回長線進化。每回合只有有限的素材放置與進化次數，所以不能再無腦把所有東西都丟進實驗區。
+          這版重新拉回長線進化。牌庫只會抽到基礎素材、效果牌與特殊卡；中間結構都要自己做，且每回合只有有限的研究次數。
         </div>
       </div>
     </section>
@@ -1385,6 +1455,7 @@ function render() {
 
 function renderGuidePanel(tutorialState, coachState, availableRecipes) {
   const readyOutputs = availableRecipes.map((item) => item.recipe.output);
+  const battlefieldText = Number.isFinite(BATTLEFIELD_LIMIT) ? `戰場上限 ${BATTLEFIELD_LIMIT} 張` : "戰場不限張數";
 
   return `
     <section class="panel">
@@ -1422,7 +1493,7 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
           <div class="guide-block">
             <strong>能量與區域</strong>
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
-            <div class="guide-text">此外每回合只能放 2 張素材、進化 1 次。實驗區上限 ${LAB_LIMIT} 張，戰場上限 ${BATTLEFIELD_LIMIT} 張。區滿了就要先丟棄。</div>
+            <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
           </div>
         </div>
 
@@ -1478,6 +1549,8 @@ function renderStatusCard(label, value, meta) {
 }
 
 function renderSidePanel(title, side, isPlayer) {
+  const battlefieldTitle = Number.isFinite(BATTLEFIELD_LIMIT) ? `戰場 ${side.battlefield.length} / ${BATTLEFIELD_LIMIT}` : `戰場 ${side.battlefield.length}`;
+
   return `
     <section class="panel">
       <div class="panel-inner zone-grid">
@@ -1487,7 +1560,7 @@ function renderSidePanel(title, side, isPlayer) {
         </div>
 
         <div class="zone">
-          <h3>戰場 ${side.battlefield.length} / ${BATTLEFIELD_LIMIT}</h3>
+          <h3>${battlefieldTitle}</h3>
           <div class="card-row">
             ${side.battlefield.length ? side.battlefield.map((card) => renderBattleCard(card, isPlayer)).join("") : '<div class="empty">目前沒有戰鬥單位。</div>'}
           </div>
@@ -1517,6 +1590,7 @@ function renderBattleCard(card, isPlayer) {
     card.ready ? '<span class="badge">可攻擊</span>' : '<span class="badge">待機</span>',
     card.shield > 0 ? `<span class="badge badge-accent">護盾 ${card.shield}</span>` : "",
     card.blockedEvolution > 0 ? `<span class="badge badge-danger">封鎖 ${card.blockedEvolution}</span>` : "",
+    card.stunnedTurns > 0 ? `<span class="badge badge-danger">阻斷 ${card.stunnedTurns}</span>` : "",
   ]
     .filter(Boolean)
     .join("");
@@ -1680,7 +1754,7 @@ function renderLogPanel() {
 
 function handCardHint(card) {
   if (card.category === "結構") {
-    return card.isBattleCard ? "特殊卡可直接部署。" : "素材放入實驗區後可用於進化，但每回合只能放 2 張。";
+    return card.isBattleCard ? "特殊卡可直接部署。" : `素材放入實驗區後可用於進化，但每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張。`;
   }
 
   const hints = {
@@ -1689,13 +1763,17 @@ function handCardHint(card) {
     copy: "複製 DNA 或 RNA。",
     shield: "保護現有或下一個細胞。",
     cleanse: "移除進化封鎖。",
+    antibiotic: "優先打擊特殊卡，也能壓低前線血量。",
     heal: "回復主體或場上單位。",
-    insight: "抽牌並增加資訊優勢。",
+    pathology: "針對已受傷的戰場單位追加打擊。",
     freeEvolution: "下一次進化不耗能。",
     cellBoost: "下一個細胞帶護盾。",
     cancer: "封鎖敵方高階單位進化。",
     flu: "壓低敵方下回合能量。",
     mutation: "破壞敵方 DNA / RNA 或加稅。",
+    apoptosis: "處決殘血單位，否則造成 2 傷害。",
+    signalBlock: "讓敵方前線下回合無法攻擊。",
+    inflammation: "對敵方全體戰場單位各造成 1 傷害。",
   };
 
   return hints[card.effect] ?? "原型效果。";
@@ -1708,13 +1786,17 @@ function effectLabel(effect) {
     copy: "複製",
     shield: "護盾",
     cleanse: "修復",
+    antibiotic: "抗生素",
     heal: "回復",
-    insight: "分析",
+    pathology: "病理",
     freeEvolution: "免耗",
     cellBoost: "培養",
     cancer: "封鎖",
     flu: "降速",
     mutation: "突變",
+    apoptosis: "凋亡",
+    signalBlock: "阻斷",
+    inflammation: "發炎",
   };
 
   return labels[effect] ?? effect;
