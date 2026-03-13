@@ -18,11 +18,11 @@ const TIER_ORDER = {
 };
 
 const TIER_STATS = {
-  真核細胞: { attack: 2, health: 4, tags: ["細胞"] },
-  上皮細胞: { attack: 3, health: 5, tags: ["細胞"] },
-  心肌細胞: { attack: 4, health: 5, tags: ["細胞"] },
-  神經細胞: { attack: 3, health: 4, tags: ["細胞"] },
-  肺泡細胞: { attack: 3, health: 5, tags: ["細胞", "呼吸"] },
+  真核細胞: { attack: 2, health: 5, tags: ["細胞"] },
+  上皮細胞: { attack: 3, health: 6, tags: ["細胞"] },
+  心肌細胞: { attack: 4, health: 7, tags: ["細胞"] },
+  神經細胞: { attack: 5, health: 4, tags: ["細胞"] },
+  肺泡細胞: { attack: 4, health: 5, tags: ["細胞", "呼吸"] },
   上皮組織: { attack: 4, health: 7, tags: ["組織"] },
   心肌組織: { attack: 5, health: 7, tags: ["組織"] },
   神經組織: { attack: 5, health: 6, tags: ["組織"] },
@@ -36,8 +36,8 @@ const TIER_STATS = {
   神經系統: { attack: 9, health: 11, tags: ["系統"] },
   呼吸系統: { attack: 8, health: 12, tags: ["系統", "呼吸"] },
   人類個體: { attack: 13, health: 18, tags: ["個體"] },
-  大腸桿菌: { attack: 4, health: 4, tags: ["特殊", "感染"] },
-  流感病毒: { attack: 3, health: 3, tags: ["特殊", "呼吸"] },
+  大腸桿菌: { attack: 3, health: 4, tags: ["特殊", "感染"] },
+  流感病毒: { attack: 2, health: 3, tags: ["特殊", "呼吸"] },
 };
 
 const CARD_GUIDE_TEXT = {
@@ -98,8 +98,8 @@ const CARD_LIBRARY = {
   神經系統: createBattleCard("系統"),
   呼吸系統: createBattleCard("系統"),
   人類個體: createBattleCard("個體"),
-  大腸桿菌: createBattleCard("特殊", { cost: 1, directPlayable: true }),
-  流感病毒: createBattleCard("特殊", { cost: 1, directPlayable: true }),
+  大腸桿菌: createBattleCard("特殊", { cost: 2, directPlayable: true }),
+  流感病毒: createBattleCard("特殊", { cost: 2, directPlayable: true }),
   移液器: createSupportCard("物品", 1, "recover"),
   離心機: createSupportCard("物品", 1, "draw"),
   "PCR 儀": createSupportCard("物品", 1, "copy"),
@@ -266,12 +266,12 @@ const DECK_BLUEPRINT = {
   "胞嘧啶(C)": 2,
   "鳥糞嘌呤(G)": 2,
   "尿嘧啶(U)": 2,
-  胺基酸: 3,
-  磷脂質: 3,
-  DNA: 1,
-  RNA: 1,
-  蛋白質: 1,
-  細胞膜: 1,
+  胺基酸: 4,
+  磷脂質: 4,
+  DNA: 2,
+  RNA: 2,
+  蛋白質: 2,
+  細胞膜: 2,
   細胞核: 1,
   核糖體: 1,
   粒線體: 1,
@@ -666,11 +666,11 @@ function resolveSupportEffect(sideKey, enemy, card) {
     case "shield": {
       const target = side.battlefield.find((item) => item.tier === "細胞");
       if (target) {
-        target.shield += 1;
-        addLog(state, `${side.label} 使用 ${card.name}，讓 ${target.name} 獲得 1 層護盾。`);
+        target.shield += 2;
+        addLog(state, `${side.label} 使用 ${card.name}，讓 ${target.name} 獲得 2 層護盾。`);
       } else {
-        side.nextCellShield += 1;
-        addLog(state, `${side.label} 使用 ${card.name}，下一個新生細胞會自帶護盾。`);
+        side.nextCellShield += 2;
+        addLog(state, `${side.label} 使用 ${card.name}，下一個新生細胞會自帶 2 層護盾。`);
       }
       break;
     }
@@ -1157,6 +1157,61 @@ function getCoachState(sideKey) {
   return COACH_TARGETS.map((output) => progressByOutput.get(output)).filter(Boolean);
 }
 
+function collectOwnedNames(side) {
+  return new Set([...side.hand, ...side.lab, ...side.battlefield, ...side.discard].map((card) => card.name));
+}
+
+function getTutorialState(sideKey, availableRecipes) {
+  const side = state.players[sideKey];
+  const ownedNames = collectOwnedNames(side);
+  const specializedCells = ["上皮細胞", "心肌細胞", "神經細胞", "肺泡細胞"];
+
+  const steps = [
+    {
+      label: "把 1 張新素材放進實驗區",
+      done: side.lab.length > STARTER_LAB.length,
+    },
+    {
+      label: "先做出任一個核心胞器",
+      done: ["核糖體", "細胞核", "粒線體"].some((name) => ownedNames.has(name)),
+    },
+    {
+      label: "做出真核細胞",
+      done: ownedNames.has("真核細胞") || specializedCells.some((name) => ownedNames.has(name)),
+    },
+    {
+      label: "把真核細胞升級成專精細胞",
+      done: specializedCells.some((name) => ownedNames.has(name)),
+    },
+  ];
+
+  const readyOutputs = availableRecipes.map((item) => item.recipe.output);
+  let nextMove = "繼續補素材，目標先做出真核細胞。";
+
+  if (!steps[0].done) {
+    nextMove = "先把手牌中的素材放進實驗區，進化系統才會開始判斷配方。";
+  } else if (readyOutputs.includes("核糖體")) {
+    nextMove = "你現在可以先做核糖體，這是做真核細胞的關鍵零件。";
+  } else if (readyOutputs.includes("細胞核")) {
+    nextMove = "你現在可以先做細胞核，接著離真核細胞就更近了。";
+  } else if (readyOutputs.includes("粒線體")) {
+    nextMove = "你現在可以先做粒線體，之後心肌細胞也會用到。";
+  } else if (readyOutputs.includes("真核細胞")) {
+    nextMove = "核心零件已經齊了，下一步直接做真核細胞。";
+  } else if (readyOutputs.some((name) => specializedCells.includes(name))) {
+    const target = readyOutputs.find((name) => specializedCells.includes(name));
+    nextMove = `你已經能做 ${target}，現在就是收下第一張高階細胞。`;
+  } else if (!steps[1].done) {
+    nextMove = "目標先湊出核糖體、細胞核或粒線體三者之一。";
+  } else if (!steps[2].done) {
+    nextMove = "你已經有部分核心零件，補齊後就能合成真核細胞。";
+  } else if (!steps[3].done) {
+    nextMove = "真核細胞已經到位，再加一張額外素材就能升級成專精細胞。";
+  }
+
+  return { steps, nextMove };
+}
+
 function findWeakestUnit(cards) {
   return [...cards].sort((left, right) => left.health - right.health)[0] ?? null;
 }
@@ -1228,6 +1283,7 @@ function render() {
   const ai = state.players.ai;
   const availableRecipes = getAvailableRecipes("player");
   const coachState = getCoachState("player");
+  const tutorialState = getTutorialState("player", availableRecipes);
   const winnerLabel =
     state.winner === "player" ? "玩家勝利" : state.winner === "ai" ? "AI 勝利" : "對局進行中";
 
@@ -1260,7 +1316,7 @@ function render() {
 
     <section class="section-grid">
       <div class="stack">
-        ${renderGuidePanel(coachState, availableRecipes)}
+        ${renderGuidePanel(tutorialState, coachState, availableRecipes)}
         ${renderSidePanel("AI 區域", ai, false)}
         ${renderEvolutionPanel(availableRecipes)}
         ${renderSidePanel("玩家區域", player, true)}
@@ -1270,7 +1326,7 @@ function render() {
   `;
 }
 
-function renderGuidePanel(coachState, availableRecipes) {
+function renderGuidePanel(tutorialState, coachState, availableRecipes) {
   const readyOutputs = availableRecipes.map((item) => item.recipe.output);
 
   return `
@@ -1279,6 +1335,24 @@ function renderGuidePanel(coachState, availableRecipes) {
         <div class="panel-title">
           <h3>進化提示</h3>
           <span>本版最高到細胞</span>
+        </div>
+
+        <div class="tutorial-callout">
+          <strong>建議下一步</strong>
+          <div class="guide-text">${tutorialState.nextMove}</div>
+        </div>
+
+        <div class="tutorial-list">
+          ${tutorialState.steps
+            .map(
+              (step) => `
+                <div class="tutorial-item">
+                  <span class="badge ${step.done ? "badge-accent" : ""}">${step.done ? "完成" : "未完成"}</span>
+                  <span>${step.label}</span>
+                </div>
+              `
+            )
+            .join("")}
         </div>
 
         <div class="guide-grid">
