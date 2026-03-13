@@ -29,15 +29,22 @@ const TIER_STATS = {
   肺泡組織: { attack: 4, health: 7, tags: ["組織", "呼吸"] },
   皮膚: { attack: 6, health: 9, tags: ["器官"] },
   心臟: { attack: 7, health: 9, tags: ["器官"] },
-  大腦: { attack: 7, health: 8, tags: ["器官"] },
+  大腦: { attack: 7, health: 8, tags: ["器官", "直擊"] },
   肺: { attack: 6, health: 10, tags: ["器官", "呼吸"] },
   外皮系統: { attack: 8, health: 12, tags: ["系統"] },
   循環系統: { attack: 9, health: 12, tags: ["系統"] },
-  神經系統: { attack: 9, health: 11, tags: ["系統"] },
+  神經系統: { attack: 9, health: 11, tags: ["系統", "直擊"] },
   呼吸系統: { attack: 8, health: 12, tags: ["系統", "呼吸"] },
   人類個體: { attack: 13, health: 18, tags: ["個體"] },
   大腸桿菌: { attack: 3, health: 4, tags: ["特殊", "感染"] },
-  流感病毒: { attack: 2, health: 3, tags: ["特殊", "呼吸"] },
+  流感病毒: { attack: 2, health: 3, tags: ["特殊", "呼吸", "直擊"] },
+};
+
+const EVOLUTION_REWARDS = {
+  細胞: { draw: 1, shield: 1 },
+  組織: { draw: 1, shield: 2 },
+  器官: { draw: 2, shield: 3, energy: 1 },
+  系統: { draw: 3, shield: 5, freeEvolution: 1 },
 };
 
 const CARD_GUIDE_TEXT = {
@@ -61,7 +68,8 @@ const CARD_GUIDE_TEXT = {
   神經細胞: "本版的高階細胞之一。",
   肺泡細胞: "本版的高階細胞之一。",
   大腸桿菌: "特殊卡，可直接部署到戰場。",
-  流感病毒: "特殊卡，可直接部署到戰場。",
+  流感病毒: "特殊卡，可直接部署，攻擊時還能越過前線。",
+  藥物: "增加本體護盾，替自己爭取更長的研究時間。",
 };
 
 const CARD_LIBRARY = {
@@ -90,21 +98,22 @@ const CARD_LIBRARY = {
   肺泡組織: createBattleCard("組織"),
   皮膚: createBattleCard("器官"),
   心臟: createBattleCard("器官"),
-  大腦: createBattleCard("器官"),
+  大腦: createBattleCard("器官", { canBypassFrontline: true }),
   肺: createBattleCard("器官"),
   外皮系統: createBattleCard("系統"),
   循環系統: createBattleCard("系統"),
-  神經系統: createBattleCard("系統"),
+  神經系統: createBattleCard("系統", { canBypassFrontline: true }),
   呼吸系統: createBattleCard("系統"),
   人類個體: createBattleCard("個體"),
   "T 細胞": createBattleCard("特殊", { cost: 2, directPlayable: true }),
   大腸桿菌: createBattleCard("特殊", { cost: 2, directPlayable: true }),
-  流感病毒: createBattleCard("特殊", { cost: 2, directPlayable: true }),
+  流感病毒: createBattleCard("特殊", { cost: 2, directPlayable: true, canBypassFrontline: true }),
   移液器: createSupportCard("物品", 1, "recover"),
   離心機: createSupportCard("物品", 1, "draw"),
   "PCR 儀": createSupportCard("物品", 1, "copy"),
   定序儀: createSupportCard("物品", 1, "sequencer"),
   培養箱: createSupportCard("物品", 1, "shield"),
+  藥物: createSupportCard("物品", 1, "medicine"),
   CRISPR: createSupportCard("物品", 1, "crispr"),
   抗生素: createSupportCard("物品", 1, "antibiotic"),
   醫師: createSupportCard("角色", 1, "heal"),
@@ -277,6 +286,7 @@ const DECK_BLUEPRINT = {
   "PCR 儀": 1,
   定序儀: 2,
   培養箱: 1,
+  藥物: 2,
   CRISPR: 2,
   抗生素: 2,
   醫師: 1,
@@ -354,6 +364,7 @@ function createSide(label) {
     freeEvolution: 0,
     evolutionTax: 0,
     nextCellShield: 0,
+    bodyShield: 0,
     healBlocked: 0,
     materialPlaysRemaining: 0,
     evolutionsRemaining: 0,
@@ -412,6 +423,7 @@ function createBattleCard(tier, overrides = {}) {
     tier,
     zone: tier === "特殊" ? "battlefield" : "evolved",
     directPlayable: Boolean(overrides.directPlayable),
+    canBypassFrontline: Boolean(overrides.canBypassFrontline),
     isBattleCard: true,
     cost: overrides.cost ?? 2,
   };
@@ -735,6 +747,11 @@ function resolveSupportEffect(sideKey, enemy, card) {
       }
       break;
     }
+    case "medicine": {
+      side.bodyShield += 4;
+      addLog(state, `${side.label} 使用 ${card.name}，獲得 4 點本體護盾。`);
+      break;
+    }
     case "cleanse": {
       const target = side.battlefield.find((item) => item.blockedEvolution > 0);
       if (target) {
@@ -830,8 +847,8 @@ function resolveSupportEffect(sideKey, enemy, card) {
         addLog(state, `${side.label} 使用 ${card.name}，封鎖 ${enemy.label} 的 ${target.name} 進化 2 回合並造成 1 點傷害。`);
         removeDeadUnits(enemy, side);
       } else {
-        enemy.hp -= 1;
-        addLog(state, `${side.label} 使用 ${card.name}，沒有目標，改為對 ${enemy.label} 造成 1 點傷害。`);
+        const damage = applyPlayerDamage(enemy, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，沒有目標，改為讓 ${describePlayerDamage(enemy.label, damage)}。`);
       }
       break;
     }
@@ -842,8 +859,8 @@ function resolveSupportEffect(sideKey, enemy, card) {
         applyDamage(respiratory, 2);
         addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 下回合少 1 點能量，並對 ${respiratory.name} 造成 2 點傷害。`);
       } else {
-        enemy.hp -= 1;
-        addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 下回合少 1 點能量，並造成 1 點主體傷害。`);
+        const damage = applyPlayerDamage(enemy, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 下回合少 1 點能量，並讓 ${describePlayerDamage(enemy.label, damage)}。`);
       }
       removeDeadUnits(enemy, side);
       break;
@@ -1108,6 +1125,8 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
     `${side.label} 進化出 ${result.name}（消耗 ${selected.recipe.text}${cost ? `，能量 ${cost}` : "，本次免能量"}）。`
   );
 
+  grantEvolutionReward(side, result);
+
   if (result.name === "人類個體") {
     state.winner = sideKey;
     addLog(state, `${side.label} 完成了人類個體，直接取得勝利。`);
@@ -1155,26 +1174,13 @@ function attackWithUnit(sideKey, cardId) {
   }
 
   const side = state.players[sideKey];
-  const enemy = state.players[sideKey === "player" ? "ai" : "player"];
   const attacker = side.battlefield.find((card) => card.id === cardId);
 
   if (!attacker || !attacker.ready) {
     return;
   }
 
-  const defender = enemy.battlefield[0];
-
-  if (defender) {
-    applyDamage(defender, attacker.attack);
-    applyDamage(attacker, defender.attack);
-    addLog(state, `${side.label} 的 ${attacker.name} 與 ${enemy.label} 的 ${defender.name} 交戰。`);
-  } else {
-    enemy.hp -= attacker.attack;
-    addLog(state, `${side.label} 的 ${attacker.name} 直接攻擊 ${enemy.label}，造成 ${attacker.attack} 點傷害。`);
-  }
-
-  attacker.ready = false;
-  cleanupAfterAction(sideKey, enemy);
+  resolveAttack(sideKey, attacker);
   render();
 }
 
@@ -1186,21 +1192,30 @@ function attackWithAll(sideKey) {
       continue;
     }
 
-    const enemy = state.players[sideKey === "player" ? "ai" : "player"];
-    const defender = enemy.battlefield[0];
-
-    if (defender) {
-      applyDamage(defender, attacker.attack);
-      applyDamage(attacker, defender.attack);
-      addLog(state, `${side.label} 的 ${attacker.name} 與 ${enemy.label} 的 ${defender.name} 交戰。`);
-    } else {
-      enemy.hp -= attacker.attack;
-      addLog(state, `${side.label} 的 ${attacker.name} 直接攻擊 ${enemy.label}，造成 ${attacker.attack} 點傷害。`);
-    }
-
-    attacker.ready = false;
-    cleanupAfterAction(sideKey, enemy);
+    resolveAttack(sideKey, attacker);
   }
+}
+
+function resolveAttack(sideKey, attacker) {
+  const side = state.players[sideKey];
+  const enemy = state.players[sideKey === "player" ? "ai" : "player"];
+  const defender = attacker.canBypassFrontline ? null : enemy.battlefield[0];
+
+  if (defender) {
+    applyDamage(defender, attacker.attack);
+    applyDamage(attacker, defender.attack);
+    addLog(state, `${side.label} 的 ${attacker.name} 與 ${enemy.label} 的 ${defender.name} 交戰。`);
+  } else {
+    const damage = applyPlayerDamage(enemy, attacker.attack);
+    const attackText =
+      attacker.canBypassFrontline && enemy.battlefield.length
+        ? `${side.label} 的 ${attacker.name} 越過前線直擊 ${enemy.label}`
+        : `${side.label} 的 ${attacker.name} 直接攻擊 ${enemy.label}`;
+    addLog(state, `${attackText}，${describePlayerDamage(enemy.label, damage)}。`);
+  }
+
+  attacker.ready = false;
+  cleanupAfterAction(sideKey, enemy);
 }
 
 function applyDamage(card, amount) {
@@ -1216,6 +1231,36 @@ function applyDamage(card, amount) {
   card.health -= amount;
 }
 
+function applyPlayerDamage(side, amount) {
+  if (amount <= 0) {
+    return { dealt: 0, blocked: 0 };
+  }
+
+  const blocked = Math.min(side.bodyShield, amount);
+  side.bodyShield -= blocked;
+
+  const dealt = amount - blocked;
+  side.hp -= dealt;
+
+  return { dealt, blocked };
+}
+
+function describePlayerDamage(targetLabel, result) {
+  if (result.dealt > 0 && result.blocked > 0) {
+    return `${targetLabel} 主體受到 ${result.dealt} 點傷害，另有 ${result.blocked} 點被本體護盾吸收`;
+  }
+
+  if (result.dealt > 0) {
+    return `${targetLabel} 主體受到 ${result.dealt} 點傷害`;
+  }
+
+  if (result.blocked > 0) {
+    return `${targetLabel} 的主體傷害被 ${result.blocked} 點本體護盾完全吸收`;
+  }
+
+  return `${targetLabel} 沒有受到傷害`;
+}
+
 function removeDeadUnits(side, enemy) {
   for (let index = side.battlefield.length - 1; index >= 0; index -= 1) {
     const card = side.battlefield[index];
@@ -1226,6 +1271,43 @@ function removeDeadUnits(side, enemy) {
     side.battlefield.splice(index, 1);
     side.discard.push(card);
     addLog(state, `${side.label} 的 ${card.name} 被摧毀。`);
+  }
+}
+
+function grantEvolutionReward(side, card) {
+  const reward = EVOLUTION_REWARDS[card.tier];
+
+  if (!reward) {
+    return;
+  }
+
+  const rewards = [];
+
+  if (reward.draw) {
+    drawCards(side, reward.draw, state);
+    rewards.push(`抽 ${reward.draw} 張牌`);
+  }
+
+  if (reward.shield) {
+    side.bodyShield += reward.shield;
+    rewards.push(`獲得 ${reward.shield} 點本體護盾`);
+  }
+
+  if (reward.energy) {
+    const gained = Math.min(reward.energy, side.maxEnergy - side.energy);
+    if (gained > 0) {
+      side.energy += gained;
+      rewards.push(`回復 ${gained} 點能量`);
+    }
+  }
+
+  if (reward.freeEvolution) {
+    side.freeEvolution += reward.freeEvolution;
+    rewards.push(`下一次進化免能量`);
+  }
+
+  if (rewards.length) {
+    addLog(state, `${side.label} 因完成 ${card.tier} 級進化獲得獎勵：${rewards.join("、")}。`);
   }
 }
 
@@ -1585,8 +1667,8 @@ function render() {
           </div>
           <div class="status-grid">
             ${renderStatusCard("回合", `T${state.turn}`, `目前：${state.activeSide === "player" ? "玩家" : "AI"}`)}
-            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, `能量 ${player.energy}，放置 ${player.materialPlaysRemaining}，進化 ${player.evolutionsRemaining}`)}
-            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, `能量 ${ai.energy}，放置 ${ai.materialPlaysRemaining}，進化 ${ai.evolutionsRemaining}`)}
+            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, `本體護盾 ${player.bodyShield}，能量 ${player.energy}，放置 ${player.materialPlaysRemaining}，進化 ${player.evolutionsRemaining}`)}
+            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, `本體護盾 ${ai.bodyShield}，能量 ${ai.energy}，放置 ${ai.materialPlaysRemaining}，進化 ${ai.evolutionsRemaining}`)}
           </div>
           <div class="controls">
             <button class="button button-primary" data-action="end-turn" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>
@@ -1655,6 +1737,7 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <strong>能量與區域</strong>
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
             <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
+            <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。<code>藥物</code> 與進化獎勵會給本體護盾，對手先打掉護盾才會傷到生命。</div>
             <div class="guide-text">如果牌庫抽乾，棄牌區會洗回牌庫，但會先承受 1 點研究壓力，所以不會再卡成單純等疲勞。</div>
           </div>
         </div>
@@ -1669,6 +1752,7 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <span class="badge">心肌細胞 = 四核心 + 額外粒線體</span>
             <span class="badge">神經細胞 = 四核心 + RNA</span>
             <span class="badge">肺泡細胞 = 四核心 + 額外細胞膜</span>
+            <span class="badge badge-accent">做出細胞 / 組織 / 器官 / 系統都會拿研究獎勵，而且越後期越好</span>
           </div>
         </div>
 
@@ -1750,6 +1834,7 @@ function renderBattleCard(card, isPlayer) {
   const badges = [
     `<span class="badge badge-accent">${card.tier}</span>`,
     card.ready ? '<span class="badge">可攻擊</span>' : '<span class="badge">待機</span>',
+    card.canBypassFrontline ? '<span class="badge badge-danger">直擊</span>' : "",
     card.shield > 0 ? `<span class="badge badge-accent">護盾 ${card.shield}</span>` : "",
     card.blockedEvolution > 0 ? `<span class="badge badge-danger">封鎖 ${card.blockedEvolution}</span>` : "",
     card.stunnedTurns > 0 ? `<span class="badge badge-danger">阻斷 ${card.stunnedTurns}</span>` : "",
@@ -1925,6 +2010,7 @@ function handCardHint(card) {
     sequencer: "回收缺少的結構，或直接找出關鍵缺件。",
     copy: "複製 DNA 或 RNA。",
     shield: "保護現有或下一個細胞。",
+    medicine: "增加本體護盾，讓你更有機會拖進中後期。",
     cleanse: "移除進化封鎖。",
     crispr: "補出缺件，並解除己方阻斷。",
     antibiotic: "優先打擊特殊卡，也能壓低前線血量。",
@@ -1952,6 +2038,7 @@ function effectLabel(effect) {
     sequencer: "定序",
     copy: "複製",
     shield: "護盾",
+    medicine: "藥物",
     cleanse: "修復",
     crispr: "編輯",
     antibiotic: "抗生素",
