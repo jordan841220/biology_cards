@@ -18,7 +18,7 @@ const TIER_ORDER = {
 };
 
 const TIER_STATS = {
-  "T 細胞": { attack: 3, health: 5, tags: ["特殊", "免疫"] },
+  "T 細胞": { attack: 2, health: 4, tags: ["特殊", "免疫"] },
   上皮細胞: { attack: 3, health: 6, tags: ["細胞"] },
   心肌細胞: { attack: 4, health: 7, tags: ["細胞"] },
   神經細胞: { attack: 5, health: 4, tags: ["細胞"] },
@@ -36,15 +36,42 @@ const TIER_STATS = {
   神經系統: { attack: 9, health: 11, tags: ["系統", "直擊"] },
   呼吸系統: { attack: 8, health: 12, tags: ["系統", "呼吸"] },
   人類個體: { attack: 13, health: 18, tags: ["個體"] },
-  大腸桿菌: { attack: 3, health: 4, tags: ["特殊", "感染"] },
-  流感病毒: { attack: 2, health: 3, tags: ["特殊", "呼吸", "直擊"] },
+  大腸桿菌: { attack: 2, health: 3, tags: ["特殊", "感染"] },
+  流感病毒: { attack: 1, health: 3, tags: ["特殊", "呼吸", "直擊"] },
 };
 
 const EVOLUTION_REWARDS = {
-  細胞: { draw: 1, shield: 1 },
-  組織: { draw: 1, shield: 2 },
-  器官: { draw: 2, shield: 3, energy: 1 },
-  系統: { draw: 3, shield: 5, freeEvolution: 1 },
+  細胞: { draw: 1, energy: 1 },
+  組織: { draw: 1, shield: 1, extraEvolution: 1 },
+  器官: { draw: 2, shield: 2, extraEvolution: 1, freeEvolution: 1 },
+  系統: { draw: 2, shield: 4, extraEvolution: 1, freeEvolution: 1 },
+};
+
+const EVOLUTION_PRIORITY = {
+  人類個體: 100,
+  神經系統: 92,
+  循環系統: 91,
+  呼吸系統: 90,
+  外皮系統: 89,
+  大腦: 82,
+  心臟: 81,
+  肺: 80,
+  皮膚: 79,
+  神經組織: 72,
+  心肌組織: 71,
+  肺泡組織: 70,
+  上皮組織: 69,
+  神經細胞: 62,
+  心肌細胞: 61,
+  肺泡細胞: 60,
+  上皮細胞: 59,
+  細胞核: 54,
+  粒線體: 53,
+  核糖體: 52,
+  細胞膜: 43,
+  蛋白質: 42,
+  RNA: 41,
+  DNA: 40,
 };
 
 const CARD_GUIDE_TEXT = {
@@ -53,15 +80,15 @@ const CARD_GUIDE_TEXT = {
   "胞嘧啶(C)": "做 DNA 用的零件。",
   "鳥糞嘌呤(G)": "做 DNA 用的零件。",
   "尿嘧啶(U)": "做 RNA 用的零件。",
-  胺基酸: "兩張胺基酸可做蛋白質。",
-  磷脂質: "兩張磷脂質可做細胞膜。",
+  胺基酸: "兩張胺基酸可做蛋白質，蛋白質也常拿來把細胞推成組織。",
+  磷脂質: "兩張磷脂質可做細胞膜，也常用在肺泡線。",
   DNA: "可用來做細胞核或粒線體。",
-  RNA: "可用來做核糖體、細胞核或神經細胞。",
-  蛋白質: "可用來做核糖體、細胞核或上皮細胞。",
-  細胞膜: "可用來做粒線體，也能作為細胞構築的一部分。",
+  RNA: "可用來做核糖體、神經細胞或大腦。",
+  蛋白質: "可用來做核糖體、細胞核，也常拿來升組織或皮膚。",
+  細胞膜: "可用來做粒線體，也能作為細胞和肺的構築材料。",
   核糖體: "做細胞時需要的核心工廠。",
   細胞核: "做細胞時需要的核心指揮中心。",
-  粒線體: "做細胞時需要的核心電池，也能做心肌細胞。",
+  粒線體: "做細胞時需要的核心電池，也能把心肌組織推成心臟。",
   "T 細胞": "免疫特化戰鬥卡，適合快速處理病原或殘血單位。",
   上皮細胞: "本版的高階細胞之一。",
   心肌細胞: "本版的高階細胞之一。",
@@ -84,7 +111,6 @@ const CARD_LIBRARY = {
   RNA: createMaterialCard("分子"),
   蛋白質: createMaterialCard("分子"),
   細胞膜: createMaterialCard("分子"),
-  染色體: createMaterialCard("胞器"),
   核糖體: createMaterialCard("胞器"),
   細胞核: createMaterialCard("胞器"),
   粒線體: createMaterialCard("胞器"),
@@ -105,7 +131,7 @@ const CARD_LIBRARY = {
   神經系統: createBattleCard("系統", { canBypassFrontline: true }),
   呼吸系統: createBattleCard("系統"),
   人類個體: createBattleCard("個體"),
-  "T 細胞": createBattleCard("特殊", { cost: 2, directPlayable: true }),
+  "T 細胞": createBattleCard("特殊", { cost: 3, directPlayable: true }),
   大腸桿菌: createBattleCard("特殊", { cost: 2, directPlayable: true }),
   流感病毒: createBattleCard("特殊", { cost: 2, directPlayable: true, canBypassFrontline: true }),
   移液器: createSupportCard("物品", 1, "recover"),
@@ -157,29 +183,24 @@ const RECIPES = [
     text: "磷脂質 x2",
   },
   {
-    output: "染色體",
-    inputs: ["DNA", "蛋白質"],
-    text: "DNA + 蛋白質",
-  },
-  {
     output: "核糖體",
     inputs: ["RNA", "蛋白質"],
     text: "RNA + 蛋白質",
   },
   {
     output: "細胞核",
-    inputs: ["DNA", "RNA", "蛋白質"],
-    text: "DNA + RNA + 蛋白質",
+    inputs: ["DNA", "蛋白質"],
+    text: "DNA + 蛋白質",
   },
   {
     output: "粒線體",
-    inputs: ["細胞膜", "DNA", "蛋白質"],
-    text: "細胞膜 + DNA + 蛋白質",
+    inputs: ["細胞膜", "DNA"],
+    text: "細胞膜 + DNA",
   },
   {
     output: "上皮細胞",
-    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體", "蛋白質"],
-    text: "細胞四核心 + 蛋白質",
+    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體"],
+    text: "細胞四核心",
   },
   {
     output: "心肌細胞",
@@ -198,43 +219,43 @@ const RECIPES = [
   },
   {
     output: "上皮組織",
-    inputs: ["上皮細胞", "上皮細胞"],
-    text: "上皮細胞 x2",
+    inputs: ["上皮細胞", "蛋白質"],
+    text: "上皮細胞 + 蛋白質",
   },
   {
     output: "心肌組織",
-    inputs: ["心肌細胞", "心肌細胞"],
-    text: "心肌細胞 x2",
+    inputs: ["心肌細胞", "蛋白質"],
+    text: "心肌細胞 + 蛋白質",
   },
   {
     output: "神經組織",
-    inputs: ["神經細胞", "神經細胞"],
-    text: "神經細胞 x2",
+    inputs: ["神經細胞", "蛋白質"],
+    text: "神經細胞 + 蛋白質",
   },
   {
     output: "肺泡組織",
-    inputs: ["肺泡細胞", "肺泡細胞"],
-    text: "肺泡細胞 x2",
+    inputs: ["肺泡細胞", "蛋白質"],
+    text: "肺泡細胞 + 蛋白質",
   },
   {
     output: "皮膚",
-    inputs: ["上皮組織", "上皮組織"],
-    text: "上皮組織 x2",
+    inputs: ["上皮組織", "蛋白質"],
+    text: "上皮組織 + 蛋白質",
   },
   {
     output: "心臟",
-    inputs: ["心肌組織", "心肌組織"],
-    text: "心肌組織 x2",
+    inputs: ["心肌組織", "粒線體"],
+    text: "心肌組織 + 粒線體",
   },
   {
     output: "大腦",
-    inputs: ["神經組織", "神經組織"],
-    text: "神經組織 x2",
+    inputs: ["神經組織", "RNA"],
+    text: "神經組織 + RNA",
   },
   {
     output: "肺",
-    inputs: ["肺泡組織", "肺泡組織"],
-    text: "肺泡組織 x2",
+    inputs: ["肺泡組織", "細胞膜"],
+    text: "肺泡組織 + 細胞膜",
   },
   {
     output: "外皮系統",
@@ -264,23 +285,24 @@ const RECIPES = [
 ];
 
 const PROTOTYPE_TIER_CAP = "個體";
-const LAB_LIMIT = 8;
+const LAB_LIMIT = 10;
 const BATTLEFIELD_LIMIT = Number.POSITIVE_INFINITY;
 const MATERIAL_PLAYS_PER_TURN = 3;
-const EVOLUTIONS_PER_TURN = 1;
+const EVOLUTIONS_PER_TURN = 2;
+const BODY_SHIELD_CAP = 12;
 const ACTIVE_RECIPES = RECIPES.filter(
   (recipe) => TIER_ORDER[CARD_LIBRARY[recipe.output].tier] <= TIER_ORDER[PROTOTYPE_TIER_CAP]
 );
 const COACH_OUTPUT_LIMIT = 6;
 
 const DECK_BLUEPRINT = {
-  "腺嘌呤(A)": 3,
-  "胸腺嘧啶(T)": 3,
-  "胞嘧啶(C)": 3,
-  "鳥糞嘌呤(G)": 3,
-  "尿嘧啶(U)": 3,
-  胺基酸: 6,
-  磷脂質: 6,
+  "腺嘌呤(A)": 4,
+  "胸腺嘧啶(T)": 4,
+  "胞嘧啶(C)": 4,
+  "鳥糞嘌呤(G)": 4,
+  "尿嘧啶(U)": 4,
+  胺基酸: 8,
+  磷脂質: 8,
   移液器: 2,
   離心機: 2,
   "PCR 儀": 1,
@@ -288,25 +310,25 @@ const DECK_BLUEPRINT = {
   培養箱: 1,
   藥物: 2,
   CRISPR: 2,
-  抗生素: 2,
+  抗生素: 1,
   醫師: 1,
-  病理學家: 2,
+  病理學家: 1,
   分子生物學家: 1,
   細胞培養師: 1,
-  HLA: 2,
+  HLA: 1,
   癌症: 1,
   流感: 1,
   遺傳性突變: 1,
-  RNAi: 2,
-  細胞凋亡: 2,
-  訊號阻斷: 2,
+  RNAi: 1,
+  細胞凋亡: 1,
+  訊號阻斷: 1,
   發炎反應: 1,
-  "T 細胞": 2,
+  "T 細胞": 1,
   大腸桿菌: 1,
   流感病毒: 1,
 };
 
-const STARTER_LAB = [];
+const STARTER_LAB = ["胺基酸", "磷脂質"];
 const INITIAL_HAND_SIZE = 7;
 const STARTING_HP = 30;
 const STARTING_ENERGY = 3;
@@ -545,7 +567,7 @@ function runAiTurn() {
       continue;
     }
 
-    const playIndex = chooseAiPlayableCard(side);
+    const playIndex = chooseAiPlayableCard(sideKey);
     if (playIndex !== -1) {
       playCard(sideKey, playIndex, { silentRender: true });
       playAllFreeMaterials(sideKey);
@@ -555,26 +577,92 @@ function runAiTurn() {
     break;
   }
 
-  attackWithAll(sideKey);
+  attackWithAll(sideKey, { smart: true });
   addLog(state, "AI 結束回合。");
 }
 
-function chooseAiPlayableCard(side) {
+function chooseAiPlayableCard(sideKey) {
+  const side = state.players[sideKey];
+  const enemy = state.players[sideKey === "player" ? "ai" : "player"];
   const hand = side.hand;
+  let bestIndex = -1;
+  let bestScore = 0;
 
-  const cardIndex = hand.findIndex((card) => {
-    if (card.category === "疾病") {
-      return state.players.player.battlefield.length > 0 && side.energy >= card.cost;
+  hand.forEach((card, index) => {
+    if (!card.directPlayable || side.energy < (card.cost ?? 0)) {
+      return;
     }
 
-    if (card.category === "結構" && !card.isBattleCard && side.materialPlaysRemaining <= 0) {
-      return false;
+    if (card.category === "結構" && !card.isBattleCard) {
+      return;
     }
 
-    return card.directPlayable && side.energy >= (card.cost ?? 0);
+    const score = scorePlayableCard(sideKey, side, enemy, card);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
   });
 
-  return cardIndex;
+  return bestIndex;
+}
+
+function scorePlayableCard(sideKey, side, enemy, card) {
+  if (card.category === "結構" && card.isBattleCard) {
+    if (card.name === "T 細胞") {
+      return enemy.battlefield.length ? 44 : enemy.hp <= 8 ? 28 : 12;
+    }
+
+    if (card.name === "大腸桿菌") {
+      return enemy.battlefield.length ? 34 : enemy.hp <= 6 ? 20 : 8;
+    }
+
+    if (card.name === "流感病毒") {
+      return enemy.hp <= 8 || enemy.bodyShield <= 1 ? 32 : 20;
+    }
+
+    return 10;
+  }
+
+  if (!card.effect) {
+    return 0;
+  }
+
+  const hasRecipes = getAvailableRecipes(sideKey).length > 0;
+  const weakUnit = findWeakestUnit(side.battlefield);
+  const missingComponent = createBestMissingComponent(side);
+  const usefulDiscard = findUsefulDiscardCard(side);
+  const hasGeneTemplate = side.lab.some((item) => item.name === "DNA" || item.name === "RNA");
+  const hasAfflictedUnit = side.battlefield.some((item) => item.blockedEvolution > 0 || item.stunnedTurns > 0);
+  const hasCell = side.battlefield.some((item) => item.tier === "細胞");
+  const incomingPressure = enemy.battlefield.reduce((sum, item) => sum + item.attack, 0);
+  const enemyRespiratory = enemy.battlefield.some((item) => item.tags.includes("呼吸"));
+
+  const scores = {
+    recover: usefulDiscard ? 30 : 8,
+    draw: side.hand.length <= 4 ? 24 : 14,
+    sequencer: usefulDiscard || missingComponent ? 42 : 18,
+    copy: hasGeneTemplate ? 30 : 6,
+    shield: hasCell ? 24 : side.nextCellShield === 0 ? 16 : 6,
+    medicine: side.hp <= 14 || incomingPressure >= 6 ? 34 : side.bodyShield <= 1 ? 18 : 5,
+    cleanse: hasAfflictedUnit ? 24 : 4,
+    crispr: missingComponent ? 46 : hasAfflictedUnit ? 26 : 10,
+    antibiotic: enemy.battlefield.length ? 31 : 0,
+    heal: weakUnit && weakUnit.health < weakUnit.maxHealth ? 26 : side.hp <= 16 ? 18 : 3,
+    hla: side.battlefield.length ? 22 : 4,
+    pathology: enemy.battlefield.length ? 30 : 0,
+    freeEvolution: hasRecipes ? 36 : 14,
+    cellBoost: hasCell ? 14 : 22,
+    cancer: enemy.battlefield.length ? 26 : 10,
+    flu: enemyRespiratory ? 26 : enemy.hp <= 8 ? 18 : 12,
+    mutation: enemy.lab.some((item) => item.name === "DNA" || item.name === "RNA") ? 24 : enemy.evolutionTax === 0 ? 16 : 5,
+    rnai: enemy.battlefield.length ? 30 : 0,
+    apoptosis: enemy.battlefield.length ? 29 : 0,
+    signalBlock: enemy.battlefield.length ? 27 : 0,
+    inflammation: enemy.battlefield.length >= 2 ? 26 : enemy.battlefield.length ? 16 : 0,
+  };
+
+  return scores[card.effect] ?? 0;
 }
 
 function playAllFreeMaterials(sideKey) {
@@ -691,8 +779,13 @@ function resolveSupportEffect(sideKey, enemy, card) {
       const discardIndex = side.discard.findIndex((item) => item.category === "結構" && !item.isBattleCard);
       if (discardIndex !== -1) {
         const recovered = side.discard.splice(discardIndex, 1)[0];
-        side.hand.push(recovered);
-        addLog(state, `${side.label} 使用 ${card.name}，回收 ${recovered.name}。`);
+        if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          side.lab.push(recovered);
+          addLog(state, `${side.label} 使用 ${card.name}，回收 ${recovered.name} 到實驗區。`);
+        } else {
+          side.hand.push(recovered);
+          addLog(state, `${side.label} 使用 ${card.name}，實驗區太滿，改為回收 ${recovered.name} 到手牌。`);
+        }
       } else {
         drawCards(side, 1, state);
         addLog(state, `${side.label} 使用 ${card.name}，沒有素材可回收，改為抽 1 張。`);
@@ -728,8 +821,14 @@ function resolveSupportEffect(sideKey, enemy, card) {
     case "copy": {
       const target = side.lab.find((item) => item.name === "DNA" || item.name === "RNA");
       if (target) {
-        side.hand.push(createCard(target.name));
-        addLog(state, `${side.label} 使用 ${card.name}，複製 1 張 ${target.name} 到手牌。`);
+        const clone = createCard(target.name);
+        if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          side.lab.push(clone);
+          addLog(state, `${side.label} 使用 ${card.name}，複製 1 張 ${target.name} 到實驗區。`);
+        } else {
+          side.hand.push(clone);
+          addLog(state, `${side.label} 使用 ${card.name}，實驗區太滿，改為把 ${target.name} 複製到手牌。`);
+        }
       } else {
         drawCards(side, 1, state);
         addLog(state, `${side.label} 使用 ${card.name}，目前沒有 DNA/RNA，改為抽 1 張。`);
@@ -748,8 +847,13 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "medicine": {
-      side.bodyShield += 4;
-      addLog(state, `${side.label} 使用 ${card.name}，獲得 4 點本體護盾。`);
+      const gained = gainBodyShield(side, 3);
+      if (gained > 0) {
+        addLog(state, `${side.label} 使用 ${card.name}，獲得 ${gained} 點本體護盾。`);
+      } else {
+        drawCards(side, 1, state);
+        addLog(state, `${side.label} 使用 ${card.name}，本體護盾已滿，改為抽 1 張牌。`);
+      }
       break;
     }
     case "cleanse": {
@@ -948,7 +1052,7 @@ function applyOnSummonEffect(sideKey, enemy, card) {
   if (card.name === "T 細胞") {
     const target = enemy.battlefield.find((item) => item.tier === "特殊") || findWeakestUnit(enemy.battlefield);
     if (target) {
-      const damage = target.tier === "特殊" ? 4 : 2;
+      const damage = target.tier === "特殊" ? 3 : 2;
       applyDamage(target, damage);
       addLog(state, `${card.name} 進場時鎖定 ${target.name}，造成 ${damage} 點傷害。`);
       removeDeadUnits(enemy, state.players[sideKey]);
@@ -1005,8 +1109,17 @@ function getAvailableRecipes(sideKey) {
       return tierDiff;
     }
 
+    const priorityDiff = getEvolutionPriority(right.recipe.output) - getEvolutionPriority(left.recipe.output);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
     return left.cost - right.cost;
   });
+}
+
+function getEvolutionPriority(name) {
+  return EVOLUTION_PRIORITY[name] ?? 0;
 }
 
 function findRecipeMatch(side, recipe) {
@@ -1115,6 +1228,9 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
       result.shield += side.nextCellShield;
       side.nextCellShield = 0;
     }
+    if (result.tier === "細胞") {
+      result.shield += 1;
+    }
     side.battlefield.push(result);
   } else {
     side.lab.push(result);
@@ -1184,7 +1300,7 @@ function attackWithUnit(sideKey, cardId) {
   render();
 }
 
-function attackWithAll(sideKey) {
+function attackWithAll(sideKey, options = {}) {
   const side = state.players[sideKey];
 
   for (const attacker of [...side.battlefield]) {
@@ -1192,8 +1308,43 @@ function attackWithAll(sideKey) {
       continue;
     }
 
+    if (options.smart && !shouldAutoAttack(sideKey, attacker)) {
+      continue;
+    }
+
     resolveAttack(sideKey, attacker);
   }
+}
+
+function shouldAutoAttack(sideKey, attacker) {
+  const enemy = state.players[sideKey === "player" ? "ai" : "player"];
+  const defender = enemy.battlefield[0];
+
+  if (!defender || attacker.canBypassFrontline) {
+    return true;
+  }
+
+  const attackerDurability = attacker.health + attacker.shield;
+  const defenderDurability = defender.health + defender.shield;
+  const attackerWouldSurvive = attackerDurability > defender.attack;
+  const attackerCanKill = attacker.attack >= defenderDurability;
+  const attackerTier = TIER_ORDER[attacker.tier] ?? 0;
+  const defenderTier = TIER_ORDER[defender.tier] ?? 0;
+  const attackerIsDisposable = attacker.tier === "特殊";
+
+  if (attackerCanKill) {
+    return true;
+  }
+
+  if (attackerIsDisposable && attacker.attack + 1 >= defenderDurability) {
+    return true;
+  }
+
+  if (attackerWouldSurvive && attackerTier <= defenderTier) {
+    return true;
+  }
+
+  return false;
 }
 
 function resolveAttack(sideKey, attacker) {
@@ -1223,12 +1374,9 @@ function applyDamage(card, amount) {
     return;
   }
 
-  if (card.shield > 0) {
-    card.shield -= 1;
-    return;
-  }
-
-  card.health -= amount;
+  const blocked = Math.min(card.shield, amount);
+  card.shield -= blocked;
+  card.health -= amount - blocked;
 }
 
 function applyPlayerDamage(side, amount) {
@@ -1243,6 +1391,17 @@ function applyPlayerDamage(side, amount) {
   side.hp -= dealt;
 
   return { dealt, blocked };
+}
+
+function gainBodyShield(side, amount) {
+  if (amount <= 0) {
+    return 0;
+  }
+
+  const nextShield = Math.min(BODY_SHIELD_CAP, side.bodyShield + amount);
+  const gained = nextShield - side.bodyShield;
+  side.bodyShield = nextShield;
+  return gained;
 }
 
 function describePlayerDamage(targetLabel, result) {
@@ -1289,8 +1448,10 @@ function grantEvolutionReward(side, card) {
   }
 
   if (reward.shield) {
-    side.bodyShield += reward.shield;
-    rewards.push(`獲得 ${reward.shield} 點本體護盾`);
+    const gained = gainBodyShield(side, reward.shield);
+    if (gained > 0) {
+      rewards.push(`獲得 ${gained} 點本體護盾`);
+    }
   }
 
   if (reward.energy) {
@@ -1304,6 +1465,11 @@ function grantEvolutionReward(side, card) {
   if (reward.freeEvolution) {
     side.freeEvolution += reward.freeEvolution;
     rewards.push(`下一次進化免能量`);
+  }
+
+  if (reward.extraEvolution) {
+    side.evolutionsRemaining += reward.extraEvolution;
+    rewards.push(`本回合追加 ${reward.extraEvolution} 次進化`);
   }
 
   if (rewards.length) {
@@ -1420,10 +1586,8 @@ function analyzeRecipeProgress(side, recipe) {
 
 function getCoachState(sideKey) {
   const side = state.players[sideKey];
-  const ownedNames = collectOwnedNames(side);
 
   return ACTIVE_RECIPES.map((recipe) => analyzeRecipeProgress(side, recipe))
-    .filter((progress) => !ownedNames.has(progress.recipe.output) || progress.recipe.output === "人類個體")
     .sort((left, right) => {
       if (left.ready !== right.ready) {
         return left.ready ? -1 : 1;
@@ -1433,10 +1597,14 @@ function getCoachState(sideKey) {
         return left.missing.length - right.missing.length;
       }
 
-      const leftTier = TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
-      const rightTier = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier];
-      if (leftTier !== rightTier) {
-        return leftTier - rightTier;
+      const tierDiff = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier] - TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
+      if (tierDiff !== 0) {
+        return tierDiff;
+      }
+
+      const priorityDiff = getEvolutionPriority(right.recipe.output) - getEvolutionPriority(left.recipe.output);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
       }
 
       return right.have.length - left.have.length;
@@ -1445,10 +1613,7 @@ function getCoachState(sideKey) {
 }
 
 function getSortedProgressOptions(side) {
-  const ownedNames = collectOwnedNames(side);
-
   return ACTIVE_RECIPES.map((recipe) => analyzeRecipeProgress(side, recipe))
-    .filter((progress) => !ownedNames.has(progress.recipe.output) || progress.recipe.output === "人類個體")
     .sort((left, right) => {
       if (left.ready !== right.ready) {
         return left.ready ? -1 : 1;
@@ -1458,10 +1623,14 @@ function getSortedProgressOptions(side) {
         return left.missing.length - right.missing.length;
       }
 
-      const leftTier = TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
-      const rightTier = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier];
-      if (leftTier !== rightTier) {
-        return leftTier - rightTier;
+      const tierDiff = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier] - TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
+      if (tierDiff !== 0) {
+        return tierDiff;
+      }
+
+      const priorityDiff = getEvolutionPriority(right.recipe.output) - getEvolutionPriority(left.recipe.output);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
       }
 
       return right.have.length - left.have.length;
@@ -1472,12 +1641,43 @@ function normalizeRecipeInput(input) {
   return input === "任意一張 DNA 鹼基" ? "腺嘌呤(A)" : input;
 }
 
+function resolveMissingStructureInput(side, input, depth = 0) {
+  const wantedName = normalizeRecipeInput(input);
+  const definition = CARD_LIBRARY[wantedName];
+
+  if (!definition || depth >= 3) {
+    return null;
+  }
+
+  if (definition.category === "結構" && !definition.isBattleCard) {
+    return wantedName;
+  }
+
+  const recipe = ACTIVE_RECIPES.find((item) => item.output === wantedName);
+  if (!recipe) {
+    return null;
+  }
+
+  const progress = analyzeRecipeProgress(side, recipe);
+  for (const missingInput of progress.missing) {
+    const resolved = resolveMissingStructureInput(side, missingInput, depth + 1);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return null;
+}
+
 function findUsefulDiscardCard(side) {
   const discardCards = side.discard.filter((card) => card.category === "結構" && !card.isBattleCard);
 
   for (const progress of getSortedProgressOptions(side)) {
     for (const input of progress.missing) {
-      const wantedName = normalizeRecipeInput(input);
+      const wantedName = resolveMissingStructureInput(side, input);
+      if (!wantedName) {
+        continue;
+      }
       const found = discardCards.find((card) => card.name === wantedName);
       if (found) {
         return found;
@@ -1491,7 +1691,10 @@ function findUsefulDiscardCard(side) {
 function createBestMissingComponent(side) {
   for (const progress of getSortedProgressOptions(side)) {
     for (const input of progress.missing) {
-      const wantedName = normalizeRecipeInput(input);
+      const wantedName = resolveMissingStructureInput(side, input);
+      if (!wantedName) {
+        continue;
+      }
       const definition = CARD_LIBRARY[wantedName];
       if (definition && definition.category === "結構" && !definition.isBattleCard) {
         return createCard(wantedName);
@@ -1532,11 +1735,11 @@ function getTutorialState(sideKey, availableRecipes) {
       done: specializedCells.some((name) => ownedNames.has(name)),
     },
     {
-      label: "用兩張同名細胞合成組織",
+      label: "用細胞加蛋白質合成組織",
       done: tissues.some((name) => ownedNames.has(name)),
     },
     {
-      label: "再把組織推進成器官或系統",
+      label: "再用組織加專精素材推進成器官",
       done: organs.some((name) => ownedNames.has(name)) || systems.some((name) => ownedNames.has(name)),
     },
   ];
@@ -1559,10 +1762,10 @@ function getTutorialState(sideKey, availableRecipes) {
     nextMove = "你現在可以先做粒線體；如果你想走心肌線，之後還會再用一次。";
   } else if (readyOutputs.some((name) => specializedCells.includes(name))) {
     const target = readyOutputs.find((name) => specializedCells.includes(name));
-    nextMove = `你已經能做 ${target}。做出來之後，下一步要想辦法再複製同一條細胞線，才能往組織升。`;
+    nextMove = `你已經能做 ${target}。做出來之後，下一步通常是補 1 張蛋白質，把它往組織推進。`;
   } else if (readyOutputs.some((name) => tissues.includes(name))) {
     const target = readyOutputs.find((name) => tissues.includes(name));
-    nextMove = `你現在可以做 ${target}。如果想走長線，優先把同名細胞疊成組織。`;
+    nextMove = `你現在可以做 ${target}。組織做出來後，再補對應的專精素材，就能往器官推進。`;
   } else if (readyOutputs.some((name) => organs.includes(name))) {
     const target = readyOutputs.find((name) => organs.includes(name));
     nextMove = `你現在可以做 ${target}。器官開始有明顯戰力，適合轉進中盤。`;
@@ -1574,9 +1777,9 @@ function getTutorialState(sideKey, availableRecipes) {
   } else if (!steps[2].done) {
     nextMove = "你已經有部分核心零件，現在要選定一條細胞線，補上最後那張專精素材。";
   } else if (!steps[3].done) {
-    nextMove = "你已經有第一張細胞了，接下來不是亂進化，而是要做出第二張同名細胞，才能升組織。";
+    nextMove = "你已經有第一張細胞了，接下來優先補蛋白質，把這張細胞組成組織。";
   } else if (!steps[4].done) {
-    nextMove = "你已經進入中盤，現在關鍵是複製同一路線，讓組織能往器官推進。";
+    nextMove = "你已經進入中盤，現在關鍵是補對應的專精素材，讓組織能往器官推進。";
   }
 
   return { steps, nextMove };
@@ -1678,8 +1881,8 @@ function render() {
           </div>
         </div>
         <div class="prototype-note">
-          <strong>Prototype 原則</strong><br />
-          這版重新拉回長線進化。牌庫只會抽到基礎素材、效果牌與特殊卡；中間結構都要自己做，且每回合只有有限的研究次數。
+          <strong>v1 原則</strong><br />
+          這版的目標是讓一局約 15 分鐘內結束，同時真的能推進到細胞後的階段。中間結構仍要自己做，但研究節奏不再被死路配方和過低素材量卡死。
         </div>
       </div>
     </section>
@@ -1730,14 +1933,14 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
           <div class="guide-block">
             <strong>白話版流程</strong>
             <div class="guide-text">把 <code>細胞膜</code> 想成外殼，<code>細胞核</code> 想成指揮中心，<code>核糖體</code> 想成工廠，<code>粒線體</code> 想成電池。這四個湊齊後，再加一張專精素材，就能直接做出細胞。</div>
-            <div class="guide-text">之後不是一直往上點，而是要選一條路線重複做同名細胞，因為兩張同名細胞才能升組織，再往器官與系統推進。</div>
+            <div class="guide-text">做出細胞後，不用先拚第二張同名細胞；先補 1 張 <code>蛋白質</code>，就能把它組成同名組織，再往器官與系統推進。</div>
           </div>
 
           <div class="guide-block">
             <strong>能量與區域</strong>
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
             <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
-            <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。<code>藥物</code> 與進化獎勵會給本體護盾，對手先打掉護盾才會傷到生命。</div>
+            <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。<code>藥物</code> 與進化獎勵會給本體護盾，但本體護盾最多累積到 ${BODY_SHIELD_CAP}。</div>
             <div class="guide-text">如果牌庫抽乾，棄牌區會洗回牌庫，但會先承受 1 點研究壓力，所以不會再卡成單純等疲勞。</div>
           </div>
         </div>
@@ -1746,9 +1949,11 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
           <strong>核心配方</strong>
           <div class="guide-recipes">
             <span class="badge">核糖體 = RNA + 蛋白質</span>
-            <span class="badge">細胞核 = DNA + RNA + 蛋白質</span>
-            <span class="badge">粒線體 = 細胞膜 + DNA + 蛋白質</span>
-            <span class="badge">上皮細胞 = 四核心 + 蛋白質</span>
+            <span class="badge">細胞核 = DNA + 蛋白質</span>
+            <span class="badge">粒線體 = 細胞膜 + DNA</span>
+            <span class="badge">上皮細胞 = 細胞四核心</span>
+            <span class="badge">上皮組織 = 上皮細胞 + 蛋白質</span>
+            <span class="badge">皮膚 = 上皮組織 + 蛋白質</span>
             <span class="badge">心肌細胞 = 四核心 + 額外粒線體</span>
             <span class="badge">神經細胞 = 四核心 + RNA</span>
             <span class="badge">肺泡細胞 = 四核心 + 額外細胞膜</span>
@@ -1949,7 +2154,7 @@ function renderEvolutionPanel(recipes) {
       <div class="panel-inner">
         <div class="panel-title">
           <h3>可進化配方</h3>
-          <span>玩家能量 ${state.players.player.energy} / 3，進化次數 ${state.players.player.evolutionsRemaining}</span>
+          <span>玩家能量 ${state.players.player.energy} / ${state.players.player.maxEnergy}，進化次數 ${state.players.player.evolutionsRemaining}</span>
         </div>
         <div class="evolution-list">
           ${
@@ -2005,10 +2210,10 @@ function handCardHint(card) {
   }
 
   const hints = {
-    recover: "回收棄牌素材，沒有素材時改為抽牌。",
+    recover: "把棄牌素材直接拉回實驗區，補節奏比補手牌更快。",
     draw: "補牌加速裝配。",
     sequencer: "回收缺少的結構，或直接找出關鍵缺件。",
-    copy: "複製 DNA 或 RNA。",
+    copy: "複製 DNA 或 RNA，優先直接放進實驗區。",
     shield: "保護現有或下一個細胞。",
     medicine: "增加本體護盾，讓你更有機會拖進中後期。",
     cleanse: "移除進化封鎖。",
