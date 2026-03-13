@@ -18,7 +18,6 @@ const TIER_ORDER = {
 };
 
 const TIER_STATS = {
-  真核細胞: { attack: 2, health: 5, tags: ["細胞"] },
   上皮細胞: { attack: 3, health: 6, tags: ["細胞"] },
   心肌細胞: { attack: 4, health: 7, tags: ["細胞"] },
   神經細胞: { attack: 5, health: 4, tags: ["細胞"] },
@@ -51,11 +50,10 @@ const CARD_GUIDE_TEXT = {
   DNA: "可用來做細胞核或粒線體。",
   RNA: "可用來做核糖體、細胞核或神經細胞。",
   蛋白質: "可用來做核糖體、細胞核或上皮細胞。",
-  細胞膜: "可用來做粒線體、真核細胞或肺泡細胞。",
-  核糖體: "真核細胞需要的四大零件之一。",
-  細胞核: "真核細胞需要的四大零件之一。",
-  粒線體: "真核細胞需要的四大零件之一，也能做心肌細胞。",
-  真核細胞: "可再升級成上皮、心肌、神經或肺泡細胞。",
+  細胞膜: "可用來做粒線體，也能作為細胞構築的一部分。",
+  核糖體: "做細胞時需要的核心工廠。",
+  細胞核: "做細胞時需要的核心指揮中心。",
+  粒線體: "做細胞時需要的核心電池，也能做心肌細胞。",
   上皮細胞: "本版的高階細胞之一。",
   心肌細胞: "本版的高階細胞之一。",
   神經細胞: "本版的高階細胞之一。",
@@ -80,7 +78,6 @@ const CARD_LIBRARY = {
   核糖體: createMaterialCard("胞器"),
   細胞核: createMaterialCard("胞器"),
   粒線體: createMaterialCard("胞器"),
-  真核細胞: createBattleCard("細胞"),
   上皮細胞: createBattleCard("細胞"),
   心肌細胞: createBattleCard("細胞"),
   神經細胞: createBattleCard("細胞"),
@@ -161,29 +158,24 @@ const RECIPES = [
     text: "細胞膜 + DNA + 蛋白質",
   },
   {
-    output: "真核細胞",
-    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體"],
-    text: "細胞膜 + 細胞核 + 核糖體 + 粒線體",
-  },
-  {
     output: "上皮細胞",
-    inputs: ["真核細胞", "蛋白質"],
-    text: "真核細胞 + 蛋白質",
+    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體", "蛋白質"],
+    text: "細胞四核心 + 蛋白質",
   },
   {
     output: "心肌細胞",
-    inputs: ["真核細胞", "粒線體"],
-    text: "真核細胞 + 粒線體",
+    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體", "粒線體"],
+    text: "細胞四核心 + 額外粒線體",
   },
   {
     output: "神經細胞",
-    inputs: ["真核細胞", "RNA"],
-    text: "真核細胞 + RNA",
+    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體", "RNA"],
+    text: "細胞四核心 + RNA",
   },
   {
     output: "肺泡細胞",
-    inputs: ["真核細胞", "細胞膜"],
-    text: "真核細胞 + 細胞膜",
+    inputs: ["細胞膜", "細胞核", "核糖體", "粒線體", "細胞膜"],
+    text: "細胞四核心 + 額外細胞膜",
   },
   {
     output: "上皮組織",
@@ -252,13 +244,15 @@ const RECIPES = [
   },
 ];
 
-const PROTOTYPE_TIER_CAP = "細胞";
+const PROTOTYPE_TIER_CAP = "個體";
 const LAB_LIMIT = 8;
 const BATTLEFIELD_LIMIT = 3;
+const MATERIAL_PLAYS_PER_TURN = 2;
+const EVOLUTIONS_PER_TURN = 1;
 const ACTIVE_RECIPES = RECIPES.filter(
   (recipe) => TIER_ORDER[CARD_LIBRARY[recipe.output].tier] <= TIER_ORDER[PROTOTYPE_TIER_CAP]
 );
-const COACH_TARGETS = ["真核細胞", "上皮細胞", "心肌細胞", "神經細胞", "肺泡細胞"];
+const COACH_OUTPUT_LIMIT = 6;
 
 const DECK_BLUEPRINT = {
   "腺嘌呤(A)": 2,
@@ -293,7 +287,7 @@ const DECK_BLUEPRINT = {
 
 const STARTER_LAB = ["DNA", "RNA", "蛋白質", "細胞膜"];
 const INITIAL_HAND_SIZE = 5;
-const STARTING_HP = 20;
+const STARTING_HP = 30;
 const STARTING_ENERGY = 3;
 const LOG_LIMIT = 14;
 
@@ -350,6 +344,8 @@ function createSide(label) {
     evolutionTax: 0,
     nextCellShield: 0,
     healBlocked: 0,
+    materialPlaysRemaining: 0,
+    evolutionsRemaining: 0,
   };
 }
 
@@ -451,6 +447,8 @@ function beginTurn(sideKey, game, options = {}) {
   const penalty = side.energyPenaltyNextTurn;
   side.energy = Math.max(1, side.maxEnergy - penalty);
   side.energyPenaltyNextTurn = 0;
+  side.materialPlaysRemaining = MATERIAL_PLAYS_PER_TURN;
+  side.evolutionsRemaining = EVOLUTIONS_PER_TURN;
 
   if (!options.skipDraw) {
     drawCards(side, 2, game);
@@ -528,6 +526,10 @@ function chooseAiPlayableCard(side) {
       return state.players.player.battlefield.length > 0 && side.energy >= card.cost;
     }
 
+    if (card.category === "結構" && !card.isBattleCard && side.materialPlaysRemaining <= 0) {
+      return false;
+    }
+
     return card.directPlayable && side.energy >= (card.cost ?? 0);
   });
 
@@ -538,7 +540,7 @@ function playAllFreeMaterials(sideKey) {
   const side = state.players[sideKey];
   let found = true;
 
-  while (found) {
+  while (found && side.materialPlaysRemaining > 0) {
     found = false;
 
     for (let index = 0; index < side.hand.length; index += 1) {
@@ -550,6 +552,7 @@ function playAllFreeMaterials(sideKey) {
 
         side.hand.splice(index, 1);
         side.lab.push(card);
+        side.materialPlaysRemaining -= 1;
         addLog(state, `${side.label} 將 ${card.name} 放入實驗區。`);
         found = true;
         break;
@@ -568,6 +571,14 @@ function playCard(sideKey, handIndex, options = {}) {
   }
 
   if (card.category === "結構" && !card.isBattleCard) {
+    if (side.materialPlaysRemaining <= 0) {
+      addLog(state, `${side.label} 這回合的素材放置次數已用完。`);
+      if (!options.silentRender) {
+        render();
+      }
+      return;
+    }
+
     if (!ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
       if (!options.silentRender) {
         render();
@@ -577,6 +588,7 @@ function playCard(sideKey, handIndex, options = {}) {
 
     side.hand.splice(handIndex, 1);
     side.lab.push(card);
+    side.materialPlaysRemaining -= 1;
     addLog(state, `${side.label} 將 ${card.name} 放入實驗區。`);
     if (!options.silentRender) {
       render();
@@ -845,6 +857,10 @@ function findRecipeMatch(side, recipe) {
 }
 
 function canPayEvolution(side) {
+  if (side.evolutionsRemaining <= 0) {
+    return false;
+  }
+
   const tax = side.evolutionTax;
   const cost = side.freeEvolution > 0 ? 0 : 1 + tax;
   return side.energy >= cost;
@@ -856,6 +872,14 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
   const selected = available.find((item) => item.recipeIndex === recipeIndex);
 
   if (!selected || state.winner) {
+    return;
+  }
+
+  if (side.evolutionsRemaining <= 0) {
+    addLog(state, `${side.label} 這回合的進化次數已用完。`);
+    if (!options.silentRender) {
+      render();
+    }
     return;
   }
 
@@ -885,6 +909,7 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
 
   const cost = side.freeEvolution > 0 ? 0 : 1 + side.evolutionTax;
   side.energy -= cost;
+  side.evolutionsRemaining -= 1;
   if (side.freeEvolution > 0) {
     side.freeEvolution -= 1;
   }
@@ -1144,17 +1169,28 @@ function analyzeRecipeProgress(side, recipe) {
 
 function getCoachState(sideKey) {
   const side = state.players[sideKey];
-  const progressByOutput = new Map();
+  const ownedNames = collectOwnedNames(side);
 
-  for (const recipe of ACTIVE_RECIPES) {
-    const progress = analyzeRecipeProgress(side, recipe);
-    const current = progressByOutput.get(recipe.output);
-    if (!current || progress.missing.length < current.missing.length || progress.have.length > current.have.length) {
-      progressByOutput.set(recipe.output, progress);
-    }
-  }
+  return ACTIVE_RECIPES.map((recipe) => analyzeRecipeProgress(side, recipe))
+    .filter((progress) => !ownedNames.has(progress.recipe.output) || progress.recipe.output === "人類個體")
+    .sort((left, right) => {
+      if (left.ready !== right.ready) {
+        return left.ready ? -1 : 1;
+      }
 
-  return COACH_TARGETS.map((output) => progressByOutput.get(output)).filter(Boolean);
+      if (left.missing.length !== right.missing.length) {
+        return left.missing.length - right.missing.length;
+      }
+
+      const leftTier = TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
+      const rightTier = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier];
+      if (leftTier !== rightTier) {
+        return leftTier - rightTier;
+      }
+
+      return right.have.length - left.have.length;
+    })
+    .slice(0, COACH_OUTPUT_LIMIT);
 }
 
 function collectOwnedNames(side) {
@@ -1165,6 +1201,9 @@ function getTutorialState(sideKey, availableRecipes) {
   const side = state.players[sideKey];
   const ownedNames = collectOwnedNames(side);
   const specializedCells = ["上皮細胞", "心肌細胞", "神經細胞", "肺泡細胞"];
+  const tissues = ["上皮組織", "心肌組織", "神經組織", "肺泡組織"];
+  const organs = ["皮膚", "心臟", "大腦", "肺"];
+  const systems = ["外皮系統", "循環系統", "神經系統", "呼吸系統"];
 
   const steps = [
     {
@@ -1176,37 +1215,55 @@ function getTutorialState(sideKey, availableRecipes) {
       done: ["核糖體", "細胞核", "粒線體"].some((name) => ownedNames.has(name)),
     },
     {
-      label: "做出真核細胞",
-      done: ownedNames.has("真核細胞") || specializedCells.some((name) => ownedNames.has(name)),
+      label: "做出第一張專精細胞",
+      done: specializedCells.some((name) => ownedNames.has(name)),
     },
     {
-      label: "把真核細胞升級成專精細胞",
-      done: specializedCells.some((name) => ownedNames.has(name)),
+      label: "用兩張同名細胞合成組織",
+      done: tissues.some((name) => ownedNames.has(name)),
+    },
+    {
+      label: "再把組織推進成器官或系統",
+      done: organs.some((name) => ownedNames.has(name)) || systems.some((name) => ownedNames.has(name)),
     },
   ];
 
   const readyOutputs = availableRecipes.map((item) => item.recipe.output);
-  let nextMove = "繼續補素材，目標先做出真核細胞。";
+  let nextMove = "先決定你這局要走哪條細胞線，再為那一條線重複湊素材。";
+
+  if (sideKey === "player" && side.materialPlaysRemaining <= 0 && side.evolutionsRemaining <= 0) {
+    nextMove = "這回合的素材放置和進化都用完了，接下來考慮攻擊、打干擾卡，或直接結束回合。";
+    return { steps, nextMove };
+  }
 
   if (!steps[0].done) {
-    nextMove = "先把手牌中的素材放進實驗區，進化系統才會開始判斷配方。";
+    nextMove = "先把手牌中的素材放進實驗區，但每回合只能放 2 張，所以要先選最需要的。";
   } else if (readyOutputs.includes("核糖體")) {
-    nextMove = "你現在可以先做核糖體，這是做真核細胞的關鍵零件。";
+    nextMove = "你現在可以先做核糖體，它是所有細胞線都會用到的核心零件。";
   } else if (readyOutputs.includes("細胞核")) {
-    nextMove = "你現在可以先做細胞核，接著離真核細胞就更近了。";
+    nextMove = "你現在可以先做細胞核，這會讓你離第一張細胞更近。";
   } else if (readyOutputs.includes("粒線體")) {
-    nextMove = "你現在可以先做粒線體，之後心肌細胞也會用到。";
-  } else if (readyOutputs.includes("真核細胞")) {
-    nextMove = "核心零件已經齊了，下一步直接做真核細胞。";
+    nextMove = "你現在可以先做粒線體；如果你想走心肌線，之後還會再用一次。";
   } else if (readyOutputs.some((name) => specializedCells.includes(name))) {
     const target = readyOutputs.find((name) => specializedCells.includes(name));
-    nextMove = `你已經能做 ${target}，現在就是收下第一張高階細胞。`;
+    nextMove = `你已經能做 ${target}。做出來之後，下一步要想辦法再複製同一條細胞線，才能往組織升。`;
+  } else if (readyOutputs.some((name) => tissues.includes(name))) {
+    const target = readyOutputs.find((name) => tissues.includes(name));
+    nextMove = `你現在可以做 ${target}。如果想走長線，優先把同名細胞疊成組織。`;
+  } else if (readyOutputs.some((name) => organs.includes(name))) {
+    const target = readyOutputs.find((name) => organs.includes(name));
+    nextMove = `你現在可以做 ${target}。器官開始有明顯戰力，適合轉進中盤。`;
+  } else if (readyOutputs.some((name) => systems.includes(name))) {
+    const target = readyOutputs.find((name) => systems.includes(name));
+    nextMove = `你現在可以做 ${target}。這已經是後期單位了，注意保留戰場位置。`;
   } else if (!steps[1].done) {
     nextMove = "目標先湊出核糖體、細胞核或粒線體三者之一。";
   } else if (!steps[2].done) {
-    nextMove = "你已經有部分核心零件，補齊後就能合成真核細胞。";
+    nextMove = "你已經有部分核心零件，現在要選定一條細胞線，補上最後那張專精素材。";
   } else if (!steps[3].done) {
-    nextMove = "真核細胞已經到位，再加一張額外素材就能升級成專精細胞。";
+    nextMove = "你已經有第一張細胞了，接下來不是亂進化，而是要做出第二張同名細胞，才能升組織。";
+  } else if (!steps[4].done) {
+    nextMove = "你已經進入中盤，現在關鍵是複製同一路線，讓組織能往器官推進。";
   }
 
   return { steps, nextMove };
@@ -1297,8 +1354,8 @@ function render() {
           </div>
           <div class="status-grid">
             ${renderStatusCard("回合", `T${state.turn}`, `目前：${state.activeSide === "player" ? "玩家" : "AI"}`)}
-            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, `能量 ${player.energy}，牌庫 ${player.deck.length}`)}
-            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, `能量 ${ai.energy}，牌庫 ${ai.deck.length}`)}
+            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, `能量 ${player.energy}，放置 ${player.materialPlaysRemaining}，進化 ${player.evolutionsRemaining}`)}
+            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, `能量 ${ai.energy}，放置 ${ai.materialPlaysRemaining}，進化 ${ai.evolutionsRemaining}`)}
           </div>
           <div class="controls">
             <button class="button button-primary" data-action="end-turn" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>
@@ -1309,7 +1366,7 @@ function render() {
         </div>
         <div class="prototype-note">
           <strong>Prototype 原則</strong><br />
-          這版先追求可玩，不先做完整平衡。進化目前最高只到細胞層級；能量就是每回合會回滿的行動點，拿來打卡和進化。
+          這版重新拉回長線進化。每回合只有有限的素材放置與進化次數，所以不能再無腦把所有東西都丟進實驗區。
         </div>
       </div>
     </section>
@@ -1333,8 +1390,8 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
     <section class="panel">
       <div class="panel-inner">
         <div class="panel-title">
-          <h3>進化提示</h3>
-          <span>本版最高到細胞</span>
+          <h3>新手教學</h3>
+          <span>從材料一路推到高階結構</span>
         </div>
 
         <div class="tutorial-callout">
@@ -1358,14 +1415,14 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
         <div class="guide-grid">
           <div class="guide-block">
             <strong>白話版流程</strong>
-            <div class="guide-text">把 <code>細胞膜</code> 想成外殼，<code>細胞核</code> 想成指揮中心，<code>核糖體</code> 想成工廠，<code>粒線體</code> 想成電池。四個湊齊後，就能做出 <code>真核細胞</code>。</div>
-            <div class="guide-text">接著用 <code>真核細胞 + 額外素材</code> 做專精細胞：蛋白質變上皮細胞、粒線體變心肌細胞、RNA 變神經細胞、細胞膜變肺泡細胞。</div>
+            <div class="guide-text">把 <code>細胞膜</code> 想成外殼，<code>細胞核</code> 想成指揮中心，<code>核糖體</code> 想成工廠，<code>粒線體</code> 想成電池。這四個湊齊後，再加一張專精素材，就能直接做出細胞。</div>
+            <div class="guide-text">之後不是一直往上點，而是要選一條路線重複做同名細胞，因為兩張同名細胞才能升組織，再往器官與系統推進。</div>
           </div>
 
           <div class="guide-block">
             <strong>能量與區域</strong>
-            <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或按下進化。</div>
-            <div class="guide-text">實驗區上限 ${LAB_LIMIT} 張，戰場上限 ${BATTLEFIELD_LIMIT} 張。區滿了就要先丟棄。</div>
+            <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
+            <div class="guide-text">此外每回合只能放 2 張素材、進化 1 次。實驗區上限 ${LAB_LIMIT} 張，戰場上限 ${BATTLEFIELD_LIMIT} 張。區滿了就要先丟棄。</div>
           </div>
         </div>
 
@@ -1375,7 +1432,10 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <span class="badge">核糖體 = RNA + 蛋白質</span>
             <span class="badge">細胞核 = DNA + RNA + 蛋白質</span>
             <span class="badge">粒線體 = 細胞膜 + DNA + 蛋白質</span>
-            <span class="badge">真核細胞 = 細胞膜 + 細胞核 + 核糖體 + 粒線體</span>
+            <span class="badge">上皮細胞 = 四核心 + 蛋白質</span>
+            <span class="badge">心肌細胞 = 四核心 + 額外粒線體</span>
+            <span class="badge">神經細胞 = 四核心 + RNA</span>
+            <span class="badge">肺泡細胞 = 四核心 + 額外細胞膜</span>
           </div>
         </div>
 
@@ -1568,7 +1628,7 @@ function renderEvolutionPanel(recipes) {
       <div class="panel-inner">
         <div class="panel-title">
           <h3>可進化配方</h3>
-          <span>玩家能量 ${state.players.player.energy} / 3</span>
+          <span>玩家能量 ${state.players.player.energy} / 3，進化次數 ${state.players.player.evolutionsRemaining}</span>
         </div>
         <div class="evolution-list">
           ${
@@ -1586,7 +1646,7 @@ function renderEvolutionPanel(recipes) {
                           class="tiny-button"
                           data-action="evolve"
                           data-recipe-index="${item.recipeIndex}"
-                          ${state.activeSide !== "player" || state.winner || item.cost > state.players.player.energy ? "disabled" : ""}
+                          ${state.activeSide !== "player" || state.winner || item.cost > state.players.player.energy || state.players.player.evolutionsRemaining <= 0 ? "disabled" : ""}
                         >
                           進化
                         </button>
@@ -1620,7 +1680,7 @@ function renderLogPanel() {
 
 function handCardHint(card) {
   if (card.category === "結構") {
-    return card.isBattleCard ? "特殊卡可直接部署。" : "素材放入實驗區後可用於進化。";
+    return card.isBattleCard ? "特殊卡可直接部署。" : "素材放入實驗區後可用於進化，但每回合只能放 2 張。";
   }
 
   const hints = {
