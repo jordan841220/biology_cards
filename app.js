@@ -18,6 +18,7 @@ const TIER_ORDER = {
 };
 
 const TIER_STATS = {
+  "T 細胞": { attack: 3, health: 5, tags: ["特殊", "免疫"] },
   上皮細胞: { attack: 3, health: 6, tags: ["細胞"] },
   心肌細胞: { attack: 4, health: 7, tags: ["細胞"] },
   神經細胞: { attack: 5, health: 4, tags: ["細胞"] },
@@ -54,6 +55,7 @@ const CARD_GUIDE_TEXT = {
   核糖體: "做細胞時需要的核心工廠。",
   細胞核: "做細胞時需要的核心指揮中心。",
   粒線體: "做細胞時需要的核心電池，也能做心肌細胞。",
+  "T 細胞": "免疫特化戰鬥卡，適合快速處理病原或殘血單位。",
   上皮細胞: "本版的高階細胞之一。",
   心肌細胞: "本版的高階細胞之一。",
   神經細胞: "本版的高階細胞之一。",
@@ -95,21 +97,25 @@ const CARD_LIBRARY = {
   神經系統: createBattleCard("系統"),
   呼吸系統: createBattleCard("系統"),
   人類個體: createBattleCard("個體"),
+  "T 細胞": createBattleCard("特殊", { cost: 2, directPlayable: true }),
   大腸桿菌: createBattleCard("特殊", { cost: 2, directPlayable: true }),
   流感病毒: createBattleCard("特殊", { cost: 2, directPlayable: true }),
   移液器: createSupportCard("物品", 1, "recover"),
   離心機: createSupportCard("物品", 1, "draw"),
   "PCR 儀": createSupportCard("物品", 1, "copy"),
+  定序儀: createSupportCard("物品", 1, "sequencer"),
   培養箱: createSupportCard("物品", 1, "shield"),
-  "CRISPR 試劑組": createSupportCard("物品", 1, "cleanse"),
+  CRISPR: createSupportCard("物品", 1, "crispr"),
   抗生素: createSupportCard("物品", 1, "antibiotic"),
   醫師: createSupportCard("角色", 1, "heal"),
   病理學家: createSupportCard("角色", 1, "pathology"),
   分子生物學家: createSupportCard("角色", 1, "freeEvolution"),
   細胞培養師: createSupportCard("角色", 1, "cellBoost"),
+  HLA: createSupportCard("角色", 1, "hla"),
   癌症: createSupportCard("疾病", 1, "cancer"),
   流感: createSupportCard("疾病", 1, "flu"),
   遺傳性突變: createSupportCard("疾病", 1, "mutation"),
+  RNAi: createSupportCard("疾病", 1, "rnai"),
   細胞凋亡: createSupportCard("疾病", 1, "apoptosis"),
   訊號阻斷: createSupportCard("疾病", 1, "signalBlock"),
   發炎反應: createSupportCard("疾病", 1, "inflammation"),
@@ -269,19 +275,23 @@ const DECK_BLUEPRINT = {
   移液器: 2,
   離心機: 2,
   "PCR 儀": 1,
+  定序儀: 2,
   培養箱: 1,
-  "CRISPR 試劑組": 1,
+  CRISPR: 2,
   抗生素: 2,
   醫師: 1,
   病理學家: 2,
   分子生物學家: 1,
   細胞培養師: 1,
+  HLA: 2,
   癌症: 1,
   流感: 1,
   遺傳性突變: 1,
+  RNAi: 2,
   細胞凋亡: 2,
   訊號阻斷: 2,
   發炎反應: 1,
+  "T 細胞": 2,
   大腸桿菌: 1,
   流感病毒: 1,
 };
@@ -428,14 +438,26 @@ function seedLab(side) {
 function drawCards(side, amount, game) {
   for (let count = 0; count < amount; count += 1) {
     if (!side.deck.length) {
-      side.hp -= 1;
-      addLog(game, `${side.label} 牌庫空了，疲勞傷害 1。`);
-      if (side.hp <= 0) {
-        game.winner = side.label === "玩家" ? "ai" : "player";
-        addLog(game, `${side.label} 因疲勞倒下。`);
-        break;
+      if (side.discard.length) {
+        side.deck = shuffle(side.discard);
+        side.discard = [];
+        side.hp -= 1;
+        addLog(game, `${side.label} 牌庫耗盡，將棄牌洗回牌庫並承受 1 點研究壓力。`);
+        if (side.hp <= 0) {
+          game.winner = side.label === "玩家" ? "ai" : "player";
+          addLog(game, `${side.label} 因研究壓力倒下。`);
+          break;
+        }
+      } else {
+        side.hp -= 1;
+        addLog(game, `${side.label} 牌庫空了，疲勞傷害 1。`);
+        if (side.hp <= 0) {
+          game.winner = side.label === "玩家" ? "ai" : "player";
+          addLog(game, `${side.label} 因疲勞倒下。`);
+          break;
+        }
+        continue;
       }
-      continue;
     }
 
     side.hand.push(side.deck.pop());
@@ -633,7 +655,7 @@ function playCard(sideKey, handIndex, options = {}) {
   side.hand.splice(handIndex, 1);
 
   if (card.category === "結構" && card.isBattleCard) {
-    card.ready = false;
+    card.ready = true;
     side.battlefield.push(card);
     addLog(state, `${side.label} 直接部署 ${card.name}。`);
     applyOnSummonEffect(sideKey, enemy, card);
@@ -671,6 +693,26 @@ function resolveSupportEffect(sideKey, enemy, card) {
       addLog(state, `${side.label} 使用 ${card.name}，抽 2 張牌。`);
       break;
     }
+    case "sequencer": {
+      const target = findUsefulDiscardCard(side);
+      if (target) {
+        if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          removeCardFromZones(side, target.id);
+          side.lab.push(target);
+          addLog(state, `${side.label} 使用 ${card.name}，從棄牌區回收 ${target.name} 到實驗區。`);
+        }
+      } else {
+        const created = createBestMissingComponent(side);
+        if (created && ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          side.lab.push(created);
+          addLog(state, `${side.label} 使用 ${card.name}，直接定位出缺少的 ${created.name}。`);
+        } else {
+          drawCards(side, 2, state);
+          addLog(state, `${side.label} 使用 ${card.name}，沒有合適目標，改為抽 2 張牌。`);
+        }
+      }
+      break;
+    }
     case "copy": {
       const target = side.lab.find((item) => item.name === "DNA" || item.name === "RNA");
       if (target) {
@@ -705,6 +747,27 @@ function resolveSupportEffect(sideKey, enemy, card) {
       }
       break;
     }
+    case "crispr": {
+      const created = createBestMissingComponent(side);
+      const afflicted = side.battlefield.find((item) => item.blockedEvolution > 0 || item.stunnedTurns > 0);
+      if (created) {
+        if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+          side.lab.push(created);
+          addLog(state, `${side.label} 使用 ${card.name}，編輯出缺少的 ${created.name}。`);
+        }
+      } else {
+        drawCards(side, 1, state);
+        addLog(state, `${side.label} 使用 ${card.name}，目前沒有明確缺件，改為抽 1 張。`);
+      }
+
+      if (afflicted) {
+        afflicted.blockedEvolution = 0;
+        afflicted.stunnedTurns = 0;
+        afflicted.ready = true;
+        addLog(state, `${side.label} 的 ${afflicted.name} 同時解除阻斷狀態。`);
+      }
+      break;
+    }
     case "heal": {
       if (side.healBlocked > 0) {
         addLog(state, `${side.label} 嘗試使用 ${card.name}，但本回合無法回復。`);
@@ -718,6 +781,20 @@ function resolveSupportEffect(sideKey, enemy, card) {
       } else {
         side.hp = Math.min(side.maxHp, side.hp + 2);
         addLog(state, `${side.label} 使用 ${card.name}，回復主體 2 點生命。`);
+      }
+      break;
+    }
+    case "hla": {
+      const target = findPreferredHlaTarget(side);
+      if (target) {
+        target.shield += 2;
+        target.blockedEvolution = 0;
+        target.stunnedTurns = 0;
+        target.ready = true;
+        addLog(state, `${side.label} 使用 ${card.name}，強化 ${target.name}，賦予 2 層護盾並解除異常。`);
+      } else {
+        drawCards(side, 1, state);
+        addLog(state, `${side.label} 使用 ${card.name}，目前沒有可標記的戰場單位，改為抽 1 張。`);
       }
       break;
     }
@@ -783,6 +860,18 @@ function resolveSupportEffect(sideKey, enemy, card) {
       }
       break;
     }
+    case "rnai": {
+      const target = findHighestTierUnit(enemy.battlefield);
+      if (target) {
+        target.attack = Math.max(1, target.attack - 2);
+        target.ready = false;
+        target.stunnedTurns = Math.max(target.stunnedTurns, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，沉默 ${target.name}，使其攻擊 -2 並下回合無法攻擊。`);
+      } else {
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場為空。`);
+      }
+      break;
+    }
     case "antibiotic": {
       const target = enemy.battlefield.find((item) => item.tier === "特殊") || enemy.battlefield[0];
       if (target) {
@@ -839,6 +928,16 @@ function resolveSupportEffect(sideKey, enemy, card) {
 }
 
 function applyOnSummonEffect(sideKey, enemy, card) {
+  if (card.name === "T 細胞") {
+    const target = enemy.battlefield.find((item) => item.tier === "特殊") || findWeakestUnit(enemy.battlefield);
+    if (target) {
+      const damage = target.tier === "特殊" ? 4 : 2;
+      applyDamage(target, damage);
+      addLog(state, `${card.name} 進場時鎖定 ${target.name}，造成 ${damage} 點傷害。`);
+      removeDeadUnits(enemy, state.players[sideKey]);
+    }
+  }
+
   if (card.name === "大腸桿菌") {
     const target = enemy.battlefield[0];
     if (target) {
@@ -1263,6 +1362,68 @@ function getCoachState(sideKey) {
     .slice(0, COACH_OUTPUT_LIMIT);
 }
 
+function getSortedProgressOptions(side) {
+  const ownedNames = collectOwnedNames(side);
+
+  return ACTIVE_RECIPES.map((recipe) => analyzeRecipeProgress(side, recipe))
+    .filter((progress) => !ownedNames.has(progress.recipe.output) || progress.recipe.output === "人類個體")
+    .sort((left, right) => {
+      if (left.ready !== right.ready) {
+        return left.ready ? -1 : 1;
+      }
+
+      if (left.missing.length !== right.missing.length) {
+        return left.missing.length - right.missing.length;
+      }
+
+      const leftTier = TIER_ORDER[CARD_LIBRARY[left.recipe.output].tier];
+      const rightTier = TIER_ORDER[CARD_LIBRARY[right.recipe.output].tier];
+      if (leftTier !== rightTier) {
+        return leftTier - rightTier;
+      }
+
+      return right.have.length - left.have.length;
+    });
+}
+
+function normalizeRecipeInput(input) {
+  return input === "任意一張 DNA 鹼基" ? "腺嘌呤(A)" : input;
+}
+
+function findUsefulDiscardCard(side) {
+  const discardCards = side.discard.filter((card) => card.category === "結構" && !card.isBattleCard);
+
+  for (const progress of getSortedProgressOptions(side)) {
+    for (const input of progress.missing) {
+      const wantedName = normalizeRecipeInput(input);
+      const found = discardCards.find((card) => card.name === wantedName);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return discardCards[0] ?? null;
+}
+
+function createBestMissingComponent(side) {
+  for (const progress of getSortedProgressOptions(side)) {
+    for (const input of progress.missing) {
+      const wantedName = normalizeRecipeInput(input);
+      const definition = CARD_LIBRARY[wantedName];
+      if (definition && definition.category === "結構" && !definition.isBattleCard) {
+        return createCard(wantedName);
+      }
+    }
+  }
+
+  return null;
+}
+
+function findPreferredHlaTarget(side) {
+  return side.battlefield.find((card) => card.name === "T 細胞") || findHighestTierUnit(side.battlefield);
+}
+
 function collectOwnedNames(side) {
   return new Set([...side.hand, ...side.lab, ...side.battlefield, ...side.discard].map((card) => card.name));
 }
@@ -1494,6 +1655,7 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <strong>能量與區域</strong>
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
             <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
+            <div class="guide-text">如果牌庫抽乾，棄牌區會洗回牌庫，但會先承受 1 點研究壓力，所以不會再卡成單純等疲勞。</div>
           </div>
         </div>
 
@@ -1760,17 +1922,21 @@ function handCardHint(card) {
   const hints = {
     recover: "回收棄牌素材，沒有素材時改為抽牌。",
     draw: "補牌加速裝配。",
+    sequencer: "回收缺少的結構，或直接找出關鍵缺件。",
     copy: "複製 DNA 或 RNA。",
     shield: "保護現有或下一個細胞。",
     cleanse: "移除進化封鎖。",
+    crispr: "補出缺件，並解除己方阻斷。",
     antibiotic: "優先打擊特殊卡，也能壓低前線血量。",
     heal: "回復主體或場上單位。",
+    hla: "保護己方前線，並解除異常。",
     pathology: "針對已受傷的戰場單位追加打擊。",
     freeEvolution: "下一次進化不耗能。",
     cellBoost: "下一個細胞帶護盾。",
     cancer: "封鎖敵方高階單位進化。",
     flu: "壓低敵方下回合能量。",
     mutation: "破壞敵方 DNA / RNA 或加稅。",
+    rnai: "讓敵方主力攻擊下降並失去下回合行動。",
     apoptosis: "處決殘血單位，否則造成 2 傷害。",
     signalBlock: "讓敵方前線下回合無法攻擊。",
     inflammation: "對敵方全體戰場單位各造成 1 傷害。",
@@ -1783,17 +1949,21 @@ function effectLabel(effect) {
   const labels = {
     recover: "回收",
     draw: "補牌",
+    sequencer: "定序",
     copy: "複製",
     shield: "護盾",
     cleanse: "修復",
+    crispr: "編輯",
     antibiotic: "抗生素",
     heal: "回復",
+    hla: "標記",
     pathology: "病理",
     freeEvolution: "免耗",
     cellBoost: "培養",
     cancer: "封鎖",
     flu: "降速",
     mutation: "突變",
+    rnai: "靜默",
     apoptosis: "凋亡",
     signalBlock: "阻斷",
     inflammation: "發炎",
