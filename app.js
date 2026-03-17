@@ -1880,7 +1880,7 @@ function render() {
             <button class="button button-secondary" data-action="restart">重新開始</button>
           </div>
         </div>
-        <div class="prototype-note">
+        <div class="version-note">
           <strong>v1 原則</strong><br />
           這版的目標是讓一局約 15 分鐘內結束，同時真的能推進到細胞後的階段。中間結構仍要自己做，但研究節奏不再被死路配方和過低素材量卡死。
         </div>
@@ -1940,7 +1940,8 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <strong>能量與區域</strong>
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
             <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
-            <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。<code>藥物</code> 與進化獎勵會給本體護盾，但本體護盾最多累積到 ${BODY_SHIELD_CAP}。</div>
+            <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。放上戰場的結構仍然可以拿來進化，只要沒有被封鎖。</div>
+            <div class="guide-text"><code>藥物</code> 與進化獎勵會給本體護盾，但本體護盾最多累積到 ${BODY_SHIELD_CAP}。</div>
             <div class="guide-text">如果牌庫抽乾，棄牌區會洗回牌庫，但會先承受 1 點研究壓力，所以不會再卡成單純等疲勞。</div>
           </div>
         </div>
@@ -2161,23 +2162,27 @@ function renderEvolutionPanel(recipes) {
             recipes.length
               ? recipes
                   .map(
-                    (item) => `
+                    (item) => {
+                      const disabledReason = getEvolutionDisabledReason(item);
+                      return `
                       <div class="evolution-item">
                         <div>
                           <strong>${item.recipe.output}</strong>
                           <div class="card-meta">素材：${item.recipe.text}</div>
                           <div class="card-meta">消耗：${item.cost === 0 ? "本次免能量" : `${item.cost} 能量`}</div>
+                          <div class="card-meta">${disabledReason ?? "可直接進化，戰場上的結構也能當素材。"}</div>
                         </div>
                         <button
                           class="tiny-button"
                           data-action="evolve"
                           data-recipe-index="${item.recipeIndex}"
-                          ${state.activeSide !== "player" || state.winner || item.cost > state.players.player.energy || state.players.player.evolutionsRemaining <= 0 ? "disabled" : ""}
+                          ${disabledReason ? "disabled" : ""}
                         >
-                          進化
+                          ${disabledReason ?? "進化"}
                         </button>
                       </div>
-                    `
+                    `;
+                    }
                   )
                   .join("")
               : '<div class="empty">目前素材還不夠，先補手牌或放置素材。</div>'
@@ -2186,6 +2191,26 @@ function renderEvolutionPanel(recipes) {
       </div>
     </section>
   `;
+}
+
+function getEvolutionDisabledReason(item) {
+  if (state.activeSide !== "player") {
+    return "等待玩家回合";
+  }
+
+  if (state.winner) {
+    return "對局已結束";
+  }
+
+  if (state.players.player.evolutionsRemaining <= 0) {
+    return "本回合進化次數用完";
+  }
+
+  if (item.cost > state.players.player.energy) {
+    return "能量不足";
+  }
+
+  return null;
 }
 
 function renderLogPanel() {
@@ -2233,7 +2258,7 @@ function handCardHint(card) {
     inflammation: "對敵方全體戰場單位各造成 1 傷害。",
   };
 
-  return hints[card.effect] ?? "原型效果。";
+  return hints[card.effect] ?? "v1 效果。";
 }
 
 function effectLabel(effect) {
