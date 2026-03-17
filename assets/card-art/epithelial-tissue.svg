@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Epithelial Tissue</title>
+  <desc id="desc">A tiled sheet of epithelial tissue cells forming a protective layer.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff7ea"/><stop offset="1" stop-color="#d8b37a"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="#fffdf8" stroke="#8f6e3e" stroke-width="8">
+    <path d="M104 140h118v96H120c-20 0-36-16-36-36v-28c0-18 10-32 20-32z"/>
+    <path d="M222 126h126v108H222z"/><path d="M348 138h126v98H348z"/>
+    <path d="M138 236h128v92H150c-22 0-40-18-40-40v-18c0-18 10-34 28-34z"/>
+    <path d="M266 234h124v94H266z"/><path d="M390 236h126v92H390z"/>
+  </g>
+  <g fill="#c9a064"><circle cx="168" cy="184" r="16"/><circle cx="286" cy="180" r="16"/><circle cx="412" cy="182" r="16"/><circle cx="206" cy="280" r="16"/><circle cx="326" cy="282" r="16"/><circle cx="450" cy="282" r="16"/></g>
+</svg>

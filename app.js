@@ -96,7 +96,37 @@ const CARD_GUIDE_TEXT = {
   肺泡細胞: "本版的高階細胞之一。",
   大腸桿菌: "特殊卡，可直接部署到戰場。",
   流感病毒: "特殊卡，可直接部署，攻擊時還能越過前線。",
-  藥物: "增加本體護盾，替自己爭取更長的研究時間。",
+  藥物: "優先治療自己身上的癌症；若目前沒有癌症，則改成提供少量本體護盾。",
+};
+
+const CARD_ART_MAP = {
+  胺基酸: "./assets/card-art/amino-acid.svg",
+  磷脂質: "./assets/card-art/phospholipid.svg",
+  DNA: "./assets/card-art/dna.svg",
+  RNA: "./assets/card-art/rna.svg",
+  蛋白質: "./assets/card-art/protein.svg",
+  細胞膜: "./assets/card-art/membrane.svg",
+  核糖體: "./assets/card-art/ribosome.svg",
+  細胞核: "./assets/card-art/nucleus.svg",
+  粒線體: "./assets/card-art/mitochondrion.svg",
+  上皮細胞: "./assets/card-art/epithelial-cell.svg",
+  心肌細胞: "./assets/card-art/cardiomyocyte.svg",
+  神經細胞: "./assets/card-art/neuron.svg",
+  肺泡細胞: "./assets/card-art/alveolar-cell.svg",
+  上皮組織: "./assets/card-art/epithelial-tissue.svg",
+  心肌組織: "./assets/card-art/cardiac-tissue.svg",
+  神經組織: "./assets/card-art/neural-tissue.svg",
+  肺泡組織: "./assets/card-art/alveolar-tissue.svg",
+  皮膚: "./assets/card-art/skin.svg",
+  心臟: "./assets/card-art/heart.svg",
+  大腦: "./assets/card-art/brain.svg",
+  肺: "./assets/card-art/lung.svg",
+  "T 細胞": "./assets/card-art/t-cell.svg",
+  HLA: "./assets/card-art/hla.svg",
+  CRISPR: "./assets/card-art/crispr.svg",
+  藥物: "./assets/card-art/medicine.svg",
+  大腸桿菌: "./assets/card-art/ecoli.svg",
+  流感病毒: "./assets/card-art/influenza-virus.svg",
 };
 
 const CARD_LIBRARY = {
@@ -388,6 +418,9 @@ function createSide(label) {
     nextCellShield: 0,
     bodyShield: 0,
     healBlocked: 0,
+    cancerCountdown: 0,
+    cancerOwnerSideKey: null,
+    apoptosisBonusActive: false,
     materialPlaysRemaining: 0,
     evolutionsRemaining: 0,
   };
@@ -423,6 +456,8 @@ function createCard(name) {
     maxHealth: stats.health ?? definition.maxHealth ?? null,
     tags: [...(stats.tags ?? definition.tags ?? [])],
     ready: false,
+    attackUsedThisTurn: false,
+    mutationDamage: 0,
     shield: 0,
     blockedEvolution: 0,
     stunnedTurns: 0,
@@ -498,6 +533,61 @@ function drawCards(side, amount, game) {
   }
 }
 
+function getOpponentSideKey(sideKey) {
+  return sideKey === "player" ? "ai" : "player";
+}
+
+function clearCancerStatus(side) {
+  side.cancerCountdown = 0;
+  side.cancerOwnerSideKey = null;
+}
+
+function applyStartOfTurnBattlefieldEffects(sideKey, game) {
+  const side = game.players[sideKey];
+  const enemy = game.players[getOpponentSideKey(sideKey)];
+  const mutatedUnits = side.battlefield.filter((card) => card.mutationDamage > 0);
+
+  mutatedUnits.forEach((card) => {
+    applyDamage(card, card.mutationDamage);
+    addLog(game, `${side.label} 的 ${card.name} 因遺傳性突變受到 ${card.mutationDamage} 點傷害。`);
+  });
+
+  if (mutatedUnits.length) {
+    removeDeadUnits(side, enemy);
+  }
+
+  if (side.cancerCountdown > 0) {
+    side.cancerCountdown -= 1;
+
+    if (side.cancerCountdown > 0) {
+      addLog(game, `${side.label} 仍受癌症影響，還有 ${side.cancerCountdown} 回合會發生癌變奪取。`);
+    } else {
+      resolveCancerTakeover(sideKey, game);
+    }
+  }
+}
+
+function resolveCancerTakeover(sideKey, game) {
+  const afflicted = game.players[sideKey];
+  const ownerKey = afflicted.cancerOwnerSideKey;
+  const owner = ownerKey ? game.players[ownerKey] : null;
+  const target = owner ? findHighestAttackUnit(afflicted.battlefield) : null;
+
+  clearCancerStatus(afflicted);
+
+  if (!owner || !target) {
+    addLog(game, `${afflicted.label} 的癌症失控，但沒有可被奪取的戰場單位。`);
+    return;
+  }
+
+  removeCardFromZones(afflicted, target.id);
+  target.ready = false;
+  target.attackUsedThisTurn = true;
+  owner.battlefield.push(target);
+  addLog(game, `${afflicted.label} 的癌症失控，${owner.label} 奪取了 ${target.name} 到自己的戰場。`);
+  cleanupAfterAction(ownerKey, afflicted);
+}
+
 function beginTurn(sideKey, game, options = {}) {
   const side = game.players[sideKey];
   game.activeSide = sideKey;
@@ -505,14 +595,19 @@ function beginTurn(sideKey, game, options = {}) {
   const penalty = side.energyPenaltyNextTurn;
   side.energy = Math.max(1, side.maxEnergy - penalty);
   side.energyPenaltyNextTurn = 0;
+  side.apoptosisBonusActive = false;
   side.materialPlaysRemaining = MATERIAL_PLAYS_PER_TURN;
   side.evolutionsRemaining = EVOLUTIONS_PER_TURN;
+
+  applyStartOfTurnBattlefieldEffects(sideKey, game);
 
   if (!options.skipDraw) {
     drawCards(side, 2, game);
   }
 
   for (const card of side.battlefield) {
+    card.attackUsedThisTurn = false;
+
     if (card.health > 0 && card.stunnedTurns <= 0) {
       card.ready = true;
     }
@@ -634,17 +729,20 @@ function scorePlayableCard(sideKey, side, enemy, card) {
   const usefulDiscard = findUsefulDiscardCard(side);
   const hasGeneTemplate = side.lab.some((item) => item.name === "DNA" || item.name === "RNA");
   const hasAfflictedUnit = side.battlefield.some((item) => item.blockedEvolution > 0 || item.stunnedTurns > 0);
+  const hasMutatedUnit = side.battlefield.some((item) => item.mutationDamage > 0);
   const hasCell = side.battlefield.some((item) => item.tier === "細胞");
   const incomingPressure = enemy.battlefield.reduce((sum, item) => sum + item.attack, 0);
   const enemyRespiratory = enemy.battlefield.some((item) => item.tags.includes("呼吸"));
+  const enemyDamagedUnit = enemy.battlefield.some((item) => item.health < item.maxHealth);
+  const enemyStrongestAttack = findHighestAttackUnit(enemy.battlefield)?.attack ?? 0;
 
   const scores = {
     recover: usefulDiscard ? 30 : 8,
     draw: side.hand.length <= 4 ? 24 : 14,
-    sequencer: usefulDiscard || missingComponent ? 42 : 18,
+    sequencer: hasMutatedUnit ? 48 : usefulDiscard || missingComponent ? 42 : 18,
     copy: hasGeneTemplate ? 30 : 6,
     shield: hasCell ? 24 : side.nextCellShield === 0 ? 16 : 6,
-    medicine: side.hp <= 14 || incomingPressure >= 6 ? 34 : side.bodyShield <= 1 ? 18 : 5,
+    medicine: side.cancerCountdown > 0 ? 60 : side.hp <= 14 || incomingPressure >= 6 ? 30 : side.bodyShield <= 1 ? 16 : 5,
     cleanse: hasAfflictedUnit ? 24 : 4,
     crispr: missingComponent ? 46 : hasAfflictedUnit ? 26 : 10,
     antibiotic: enemy.battlefield.length ? 31 : 0,
@@ -653,11 +751,11 @@ function scorePlayableCard(sideKey, side, enemy, card) {
     pathology: enemy.battlefield.length ? 30 : 0,
     freeEvolution: hasRecipes ? 36 : 14,
     cellBoost: hasCell ? 14 : 22,
-    cancer: enemy.battlefield.length ? 26 : 10,
+    cancer: enemy.cancerCountdown > 0 ? 6 : enemy.battlefield.length ? 28 + enemyStrongestAttack : 16,
     flu: enemyRespiratory ? 26 : enemy.hp <= 8 ? 18 : 12,
-    mutation: enemy.lab.some((item) => item.name === "DNA" || item.name === "RNA") ? 24 : enemy.evolutionTax === 0 ? 16 : 5,
+    mutation: enemy.battlefield.length ? 24 + enemyStrongestAttack : 0,
     rnai: enemy.battlefield.length ? 30 : 0,
-    apoptosis: enemy.battlefield.length ? 29 : 0,
+    apoptosis: enemyDamagedUnit ? 36 : enemy.battlefield.length >= 2 ? 14 : 6,
     signalBlock: enemy.battlefield.length ? 27 : 0,
     inflammation: enemy.battlefield.length >= 2 ? 26 : enemy.battlefield.length ? 16 : 0,
   };
@@ -799,21 +897,27 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "sequencer": {
-      const target = findUsefulDiscardCard(side);
-      if (target) {
-        if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
-          removeCardFromZones(side, target.id);
-          side.lab.push(target);
-          addLog(state, `${side.label} 使用 ${card.name}，從棄牌區回收 ${target.name} 到實驗區。`);
-        }
+      const mutatedTarget = findHighestTierUnit(side.battlefield.filter((item) => item.mutationDamage > 0));
+      if (mutatedTarget) {
+        mutatedTarget.mutationDamage = 0;
+        addLog(state, `${side.label} 使用 ${card.name}，完成 ${mutatedTarget.name} 的定序分析並解除遺傳性突變。`);
       } else {
-        const created = createBestMissingComponent(side);
-        if (created && ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
-          side.lab.push(created);
-          addLog(state, `${side.label} 使用 ${card.name}，直接定位出缺少的 ${created.name}。`);
+        const target = findUsefulDiscardCard(side);
+        if (target) {
+          if (ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+            removeCardFromZones(side, target.id);
+            side.lab.push(target);
+            addLog(state, `${side.label} 使用 ${card.name}，從棄牌區回收 ${target.name} 到實驗區。`);
+          }
         } else {
-          drawCards(side, 2, state);
-          addLog(state, `${side.label} 使用 ${card.name}，沒有合適目標，改為抽 2 張牌。`);
+          const created = createBestMissingComponent(side);
+          if (created && ensureZoneSpace(sideKey, "lab", side.lab.length + 1 - LAB_LIMIT)) {
+            side.lab.push(created);
+            addLog(state, `${side.label} 使用 ${card.name}，直接定位出缺少的 ${created.name}。`);
+          } else {
+            drawCards(side, 2, state);
+            addLog(state, `${side.label} 使用 ${card.name}，沒有合適目標，改為抽 2 張牌。`);
+          }
         }
       }
       break;
@@ -847,12 +951,18 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "medicine": {
-      const gained = gainBodyShield(side, 3);
-      if (gained > 0) {
-        addLog(state, `${side.label} 使用 ${card.name}，獲得 ${gained} 點本體護盾。`);
+      if (side.cancerCountdown > 0) {
+        clearCancerStatus(side);
+        const gained = gainBodyShield(side, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，抑制癌症進程${gained > 0 ? `，並獲得 ${gained} 點本體護盾` : ""}。`);
       } else {
-        drawCards(side, 1, state);
-        addLog(state, `${side.label} 使用 ${card.name}，本體護盾已滿，改為抽 1 張牌。`);
+        const gained = gainBodyShield(side, 2);
+        if (gained > 0) {
+          addLog(state, `${side.label} 使用 ${card.name}，沒有癌症需要治療，改為提供 ${gained} 點本體護盾。`);
+        } else {
+          drawCards(side, 1, state);
+          addLog(state, `${side.label} 使用 ${card.name}，目前沒有癌症且護盾已滿，改為抽 1 張牌。`);
+        }
       }
       break;
     }
@@ -884,7 +994,7 @@ function resolveSupportEffect(sideKey, enemy, card) {
       if (afflicted) {
         afflicted.blockedEvolution = 0;
         afflicted.stunnedTurns = 0;
-        afflicted.ready = true;
+        afflicted.ready = !afflicted.attackUsedThisTurn;
         addLog(state, `${side.label} 的 ${afflicted.name} 同時解除阻斷狀態。`);
       }
       break;
@@ -911,7 +1021,7 @@ function resolveSupportEffect(sideKey, enemy, card) {
         target.shield += 2;
         target.blockedEvolution = 0;
         target.stunnedTurns = 0;
-        target.ready = true;
+        target.ready = !target.attackUsedThisTurn;
         addLog(state, `${side.label} 使用 ${card.name}，強化 ${target.name}，賦予 2 層護盾並解除異常。`);
       } else {
         drawCards(side, 1, state);
@@ -944,16 +1054,9 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "cancer": {
-      const target = findHighestTierUnit(enemy.battlefield);
-      if (target) {
-        target.blockedEvolution = 2;
-        applyDamage(target, 1);
-        addLog(state, `${side.label} 使用 ${card.name}，封鎖 ${enemy.label} 的 ${target.name} 進化 2 回合並造成 1 點傷害。`);
-        removeDeadUnits(enemy, side);
-      } else {
-        const damage = applyPlayerDamage(enemy, 1);
-        addLog(state, `${side.label} 使用 ${card.name}，沒有目標，改為讓 ${describePlayerDamage(enemy.label, damage)}。`);
-      }
+      enemy.cancerCountdown = 5;
+      enemy.cancerOwnerSideKey = sideKey;
+      addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 進入癌症倒數 5 回合；期間不能丟棄，結束時會被奪取當前最高攻擊單位。`);
       break;
     }
     case "flu": {
@@ -970,14 +1073,12 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "mutation": {
-      const labIndex = enemy.lab.findIndex((item) => item.name === "DNA" || item.name === "RNA");
-      if (labIndex !== -1) {
-        const removed = enemy.lab.splice(labIndex, 1)[0];
-        enemy.discard.push(removed);
-        addLog(state, `${side.label} 使用 ${card.name}，破壞 ${enemy.label} 的 ${removed.name}。`);
+      const target = findHighestAttackUnit(enemy.battlefield);
+      if (target) {
+        target.mutationDamage = Math.max(target.mutationDamage, 1);
+        addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 的 ${target.name} 帶上遺傳性突變，之後每回合受到 1 點傷害。`);
       } else {
-        enemy.evolutionTax += 1;
-        addLog(state, `${side.label} 使用 ${card.name}，讓 ${enemy.label} 下一次進化多消耗 1 點能量。`);
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場沒有可承受突變的單位。`);
       }
       break;
     }
@@ -1006,18 +1107,11 @@ function resolveSupportEffect(sideKey, enemy, card) {
       break;
     }
     case "apoptosis": {
-      const target = findWeakestUnit(enemy.battlefield);
-      if (target) {
-        if (target.health <= 3) {
-          target.health = 0;
-          addLog(state, `${side.label} 使用 ${card.name}，直接誘發 ${target.name} 凋亡。`);
-        } else {
-          applyDamage(target, 2);
-          addLog(state, `${side.label} 使用 ${card.name}，對 ${target.name} 造成 2 點傷害。`);
-        }
-        removeDeadUnits(enemy, side);
+      if (enemy.battlefield.length) {
+        side.apoptosisBonusActive = true;
+        addLog(state, `${side.label} 使用 ${card.name}，本回合攻擊殘血戰場單位時會額外造成 2 點傷害。`);
       } else {
-        addLog(state, `${side.label} 使用 ${card.name}，但沒有可凋亡的目標。`);
+        addLog(state, `${side.label} 使用 ${card.name}，但對手戰場為空。`);
       }
       break;
     }
@@ -1165,6 +1259,10 @@ function canPayEvolution(side) {
   return side.energy >= cost;
 }
 
+function canUnitAttack(card) {
+  return Boolean(card && card.ready && !card.attackUsedThisTurn && card.health > 0 && card.stunnedTurns <= 0);
+}
+
 function evolveCard(sideKey, recipeIndex, options = {}) {
   const side = state.players[sideKey];
   const available = getAvailableRecipes(sideKey);
@@ -1206,6 +1304,11 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
     return;
   }
 
+  const lineageSpentAttack = selected.match.some((card) => card.isBattleCard && card.attackUsedThisTurn);
+  const lineageMutationDamage = selected.match.reduce(
+    (highest, card) => (card.isBattleCard ? Math.max(highest, card.mutationDamage) : highest),
+    0
+  );
   const cost = side.freeEvolution > 0 ? 0 : 1 + side.evolutionTax;
   side.energy -= cost;
   side.evolutionsRemaining -= 1;
@@ -1223,7 +1326,9 @@ function evolveCard(sideKey, recipeIndex, options = {}) {
   }
 
   if (result.isBattleCard) {
-    result.ready = true;
+    result.attackUsedThisTurn = lineageSpentAttack;
+    result.mutationDamage = lineageMutationDamage;
+    result.ready = !lineageSpentAttack;
     if (result.tier === "細胞" && side.nextCellShield > 0) {
       result.shield += side.nextCellShield;
       side.nextCellShield = 0;
@@ -1268,6 +1373,15 @@ function removeCardFromZones(side, cardId) {
 
 function discardZoneCard(sideKey, zone, cardId, options = {}) {
   const side = state.players[sideKey];
+
+  if (side.cancerCountdown > 0) {
+    addLog(state, `${side.label} 正受癌症影響，暫時不能丟棄卡牌。`);
+    if (!options.silentRender) {
+      render();
+    }
+    return false;
+  }
+
   const card = removeCardFromZones(side, cardId);
 
   if (!card) {
@@ -1292,7 +1406,7 @@ function attackWithUnit(sideKey, cardId) {
   const side = state.players[sideKey];
   const attacker = side.battlefield.find((card) => card.id === cardId);
 
-  if (!attacker || !attacker.ready) {
+  if (!canUnitAttack(attacker)) {
     return;
   }
 
@@ -1304,7 +1418,7 @@ function attackWithAll(sideKey, options = {}) {
   const side = state.players[sideKey];
 
   for (const attacker of [...side.battlefield]) {
-    if (!attacker.ready || state.winner) {
+    if (!canUnitAttack(attacker) || state.winner) {
       continue;
     }
 
@@ -1317,6 +1431,7 @@ function attackWithAll(sideKey, options = {}) {
 }
 
 function shouldAutoAttack(sideKey, attacker) {
+  const side = state.players[sideKey];
   const enemy = state.players[sideKey === "player" ? "ai" : "player"];
   const defender = enemy.battlefield[0];
 
@@ -1327,7 +1442,9 @@ function shouldAutoAttack(sideKey, attacker) {
   const attackerDurability = attacker.health + attacker.shield;
   const defenderDurability = defender.health + defender.shield;
   const attackerWouldSurvive = attackerDurability > defender.attack;
-  const attackerCanKill = attacker.attack >= defenderDurability;
+  const attackBonus = side.apoptosisBonusActive && defender.health < defender.maxHealth ? 2 : 0;
+  const effectiveAttack = attacker.attack + attackBonus;
+  const attackerCanKill = effectiveAttack >= defenderDurability;
   const attackerTier = TIER_ORDER[attacker.tier] ?? 0;
   const defenderTier = TIER_ORDER[defender.tier] ?? 0;
   const attackerIsDisposable = attacker.tier === "特殊";
@@ -1336,7 +1453,7 @@ function shouldAutoAttack(sideKey, attacker) {
     return true;
   }
 
-  if (attackerIsDisposable && attacker.attack + 1 >= defenderDurability) {
+  if (attackerIsDisposable && effectiveAttack + 1 >= defenderDurability) {
     return true;
   }
 
@@ -1353,9 +1470,13 @@ function resolveAttack(sideKey, attacker) {
   const defender = attacker.canBypassFrontline ? null : enemy.battlefield[0];
 
   if (defender) {
-    applyDamage(defender, attacker.attack);
+    const attackBonus = side.apoptosisBonusActive && defender.health < defender.maxHealth ? 2 : 0;
+    applyDamage(defender, attacker.attack + attackBonus);
     applyDamage(attacker, defender.attack);
-    addLog(state, `${side.label} 的 ${attacker.name} 與 ${enemy.label} 的 ${defender.name} 交戰。`);
+    addLog(
+      state,
+      `${side.label} 的 ${attacker.name} 與 ${enemy.label} 的 ${defender.name} 交戰${attackBonus > 0 ? "，細胞凋亡使這次攻擊額外 +2 傷害" : ""}。`
+    );
   } else {
     const damage = applyPlayerDamage(enemy, attacker.attack);
     const attackText =
@@ -1365,6 +1486,7 @@ function resolveAttack(sideKey, attacker) {
     addLog(state, `${attackText}，${describePlayerDamage(enemy.label, damage)}。`);
   }
 
+  attacker.attackUsedThisTurn = true;
   attacker.ready = false;
   cleanupAfterAction(sideKey, enemy);
 }
@@ -1514,7 +1636,8 @@ function ensureZoneSpace(sideKey, zone, overflow, protectedIds = new Set()) {
   for (let count = 0; count < overflow; count += 1) {
     const removed = autoDiscardFromZone(sideKey, zone, protectedIds);
     if (!removed) {
-      addLog(state, `${side.label} 的 ${getZoneLabel(zone)} 已滿，這次行動失敗。`);
+      const reason = side.cancerCountdown > 0 ? "而且正受癌症影響無法丟棄" : "";
+      addLog(state, `${side.label} 的 ${getZoneLabel(zone)} 已滿${reason}，這次行動失敗。`);
       return false;
     }
   }
@@ -1524,6 +1647,10 @@ function ensureZoneSpace(sideKey, zone, overflow, protectedIds = new Set()) {
 
 function autoDiscardFromZone(sideKey, zone, protectedIds = new Set()) {
   const side = state.players[sideKey];
+  if (side.cancerCountdown > 0) {
+    return null;
+  }
+
   const zoneCards = side[zone].filter((card) => !protectedIds.has(card.id));
   if (!zoneCards.length) {
     return null;
@@ -1584,10 +1711,53 @@ function analyzeRecipeProgress(side, recipe) {
   };
 }
 
+function getRecipeByOutput(output) {
+  return ACTIVE_RECIPES.find((recipe) => recipe.output === output) ?? null;
+}
+
+function formatCoachInput(input) {
+  if (input === "任意一張 DNA 鹼基") {
+    return "任意 DNA 鹼基（A / T / C / G）";
+  }
+
+  const normalized = normalizeRecipeInput(input);
+  const recipe = getRecipeByOutput(normalized);
+  if (!recipe) {
+    return normalized;
+  }
+
+  return `${normalized}（${recipe.text}）`;
+}
+
+function buildCoachBridge(side, progress) {
+  if (progress.missing.length !== 1) {
+    return null;
+  }
+
+  const target = normalizeRecipeInput(progress.missing[0]);
+  const recipe = getRecipeByOutput(target);
+  if (!recipe) {
+    return null;
+  }
+
+  const targetProgress = analyzeRecipeProgress(side, recipe);
+
+  return {
+    target,
+    recipeText: recipe.text,
+    missingDetailed: targetProgress.missing.map((input) => formatCoachInput(input)),
+  };
+}
+
 function getCoachState(sideKey) {
   const side = state.players[sideKey];
 
   return ACTIVE_RECIPES.map((recipe) => analyzeRecipeProgress(side, recipe))
+    .map((progress) => ({
+      ...progress,
+      missingDetailed: progress.missing.map((input) => formatCoachInput(input)),
+      bridge: buildCoachBridge(side, progress),
+    }))
     .sort((left, right) => {
       if (left.ready !== right.ready) {
         return left.ready ? -1 : 1;
@@ -1789,6 +1959,16 @@ function findWeakestUnit(cards) {
   return [...cards].sort((left, right) => left.health - right.health)[0] ?? null;
 }
 
+function findHighestAttackUnit(cards) {
+  return [...cards].sort((left, right) => {
+    if (right.attack !== left.attack) {
+      return right.attack - left.attack;
+    }
+
+    return TIER_ORDER[right.tier] - TIER_ORDER[left.tier];
+  })[0] ?? null;
+}
+
 function findHighestTierUnit(cards) {
   return [...cards].sort((left, right) => {
     const tierDiff = TIER_ORDER[right.tier] - TIER_ORDER[left.tier];
@@ -1870,8 +2050,8 @@ function render() {
           </div>
           <div class="status-grid">
             ${renderStatusCard("回合", `T${state.turn}`, `目前：${state.activeSide === "player" ? "玩家" : "AI"}`)}
-            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, `本體護盾 ${player.bodyShield}，能量 ${player.energy}，放置 ${player.materialPlaysRemaining}，進化 ${player.evolutionsRemaining}`)}
-            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, `本體護盾 ${ai.bodyShield}，能量 ${ai.energy}，放置 ${ai.materialPlaysRemaining}，進化 ${ai.evolutionsRemaining}`)}
+            ${renderStatusCard("玩家", `HP ${player.hp} / ${player.maxHp}`, buildSideStatusMeta(player))}
+            ${renderStatusCard("AI", `HP ${ai.hp} / ${ai.maxHp}`, buildSideStatusMeta(ai))}
           </div>
           <div class="controls">
             <button class="button button-primary" data-action="end-turn" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>
@@ -1941,7 +2121,8 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
             <div class="guide-text">能量就是每回合的行動點。每回合會回到 3 點，用來打支援卡、特殊卡，或支付進化。</div>
             <div class="guide-text">此外每回合只能放 ${MATERIAL_PLAYS_PER_TURN} 張素材、進化 ${EVOLUTIONS_PER_TURN} 次。實驗區上限 ${LAB_LIMIT} 張，${battlefieldText}。</div>
             <div class="guide-text">一般戰鬥單位會先打對手戰場，只有帶 <code>直擊</code> 標籤的少數卡牌能越線打本體。放上戰場的結構仍然可以拿來進化，只要沒有被封鎖。</div>
-            <div class="guide-text"><code>藥物</code> 與進化獎勵會給本體護盾，但本體護盾最多累積到 ${BODY_SHIELD_CAP}。</div>
+            <div class="guide-text"><code>藥物</code> 會優先治療自己身上的癌症，沒有癌症時才補本體護盾；<code>定序儀</code> 則能解除戰場單位的遺傳性突變。</div>
+            <div class="guide-text">進化獎勵與部分支持效果仍會提供本體護盾，但本體護盾最多累積到 ${BODY_SHIELD_CAP}。</div>
             <div class="guide-text">如果牌庫抽乾，棄牌區會洗回牌庫，但會先承受 1 點研究壓力，所以不會再卡成單純等疲勞。</div>
           </div>
         </div>
@@ -1969,7 +2150,12 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
               .map((item) => {
                 const ready = readyOutputs.includes(item.recipe.output);
                 const haveText = item.have.length ? `已有：${item.have.join("、")}` : "已有：還沒有關鍵材料";
-                const missingText = item.missing.length ? `還缺：${item.missing.join("、")}` : "已可直接進化";
+                const missingText = item.missingDetailed.length ? `還缺：${item.missingDetailed.join("、")}` : "已可直接進化";
+                const bridgeText = item.bridge ? `先做：${item.bridge.target} = ${item.bridge.recipeText}` : "";
+                const bridgeMissingText =
+                  item.bridge && item.bridge.missingDetailed.length
+                    ? `${item.bridge.target} 目前還缺：${item.bridge.missingDetailed.join("、")}`
+                    : "";
 
                 return `
                   <div class="coach-item">
@@ -1977,6 +2163,8 @@ function renderGuidePanel(tutorialState, coachState, availableRecipes) {
                       <strong>${item.recipe.output}</strong>
                       <div class="card-meta">${haveText}</div>
                       <div class="card-meta">${missingText}</div>
+                      ${bridgeText ? `<div class="card-meta">${bridgeText}</div>` : ""}
+                      ${bridgeMissingText ? `<div class="card-meta">${bridgeMissingText}</div>` : ""}
                     </div>
                     <span class="badge ${ready ? "badge-accent" : ""}">${ready ? "現在可做" : "準備中"}</span>
                   </div>
@@ -1998,6 +2186,21 @@ function renderStatusCard(label, value, meta) {
       <div class="card-meta">${meta}</div>
     </div>
   `;
+}
+
+function buildSideStatusMeta(side) {
+  const statuses = [];
+
+  if (side.cancerCountdown > 0) {
+    statuses.push(`癌症 ${side.cancerCountdown}`);
+  }
+
+  if (side.apoptosisBonusActive) {
+    statuses.push("凋亡加成中");
+  }
+
+  const statusText = statuses.length ? `，狀態 ${statuses.join(" / ")}` : "";
+  return `本體護盾 ${side.bodyShield}，能量 ${side.energy}，放置 ${side.materialPlaysRemaining}，進化 ${side.evolutionsRemaining}${statusText}`;
 }
 
 function renderSidePanel(title, side, isPlayer) {
@@ -2036,20 +2239,215 @@ function renderSidePanel(title, side, isPlayer) {
   `;
 }
 
+function getCardThemeClass(card) {
+  if (card.category === "物品") {
+    return "card-theme-item";
+  }
+
+  if (card.category === "角色") {
+    return "card-theme-character";
+  }
+
+  if (card.category === "疾病") {
+    return "card-theme-disease";
+  }
+
+  const structureThemes = {
+    基礎分子: "card-theme-base",
+    分子: "card-theme-molecule",
+    胞器: "card-theme-organelle",
+    細胞: "card-theme-cell",
+    組織: "card-theme-tissue",
+    器官: "card-theme-organ",
+    系統: "card-theme-system",
+    個體: "card-theme-individual",
+    特殊: "card-theme-special",
+  };
+
+  return structureThemes[card.tier] ?? "card-theme-neutral";
+}
+
+function getCardSigil(card) {
+  const compactName = card.name.replace(/\s+/g, "");
+  const ascii = compactName.match(/[A-Za-z0-9]+/g)?.join("");
+
+  if (ascii) {
+    return ascii.slice(0, 6).toUpperCase();
+  }
+
+  if (compactName.length <= 3) {
+    return compactName;
+  }
+
+  return compactName.slice(0, 2);
+}
+
+function getCardHeroLabel(card) {
+  if (card.category === "結構" && card.isBattleCard) {
+    return card.directPlayable ? "戰場單位" : "進化單位";
+  }
+
+  if (card.category === "結構") {
+    return "進化素材";
+  }
+
+  if (card.category === "物品") {
+    return "實驗工具";
+  }
+
+  if (card.category === "角色") {
+    return "研究角色";
+  }
+
+  if (card.category === "疾病") {
+    return "干擾事件";
+  }
+
+  return card.category;
+}
+
+function getCardHeroText(card) {
+  if (card.category === "結構" && card.isBattleCard) {
+    if (card.canBypassFrontline) {
+      return "可越過前線直擊對手本體";
+    }
+
+    if (card.directPlayable) {
+      return "可直接部署上場搶節奏";
+    }
+
+    return "透過研究進化誕生的主力單位";
+  }
+
+  if (card.category === "結構") {
+    return card.tier === "基礎分子" ? "研究鏈的起點素材" : "可投入進化配方";
+  }
+
+  if (card.category === "物品") {
+    return "立即提供器材支援";
+  }
+
+  if (card.category === "角色") {
+    return "提供研究與培養增益";
+  }
+
+  if (card.category === "疾病") {
+    return "破壞對手節奏與單位";
+  }
+
+  return "v1 卡牌";
+}
+
+function renderCardTopline(card, options = {}) {
+  const leftText = options.leftText ?? (card.tier ?? card.category);
+  const rightText = options.rightText ?? (options.showCost && card.cost != null ? `能量 ${card.cost}` : "");
+
+  return `
+    <div class="card-topline">
+      <span class="card-ribbon">${leftText}</span>
+      ${rightText ? `<span class="card-ribbon card-ribbon-strong">${rightText}</span>` : ""}
+    </div>
+  `;
+}
+
+function getCardArtPath(card) {
+  return CARD_ART_MAP[card.name] ?? null;
+}
+
+function renderCardVisual(card, options = {}) {
+  const artPath = getCardArtPath(card);
+
+  if (!artPath) {
+    return renderCardHero(card, options);
+  }
+
+  return `
+    <div class="card-illustration">
+      <img class="card-art" src="${artPath}" alt="${card.name} 卡面插圖" loading="lazy" />
+    </div>
+  `;
+}
+
+function renderCardHero(card, options = {}) {
+  const label = options.label ?? getCardHeroLabel(card);
+  const text = options.text ?? getCardHeroText(card);
+
+  return `
+    <div class="card-hero">
+      <div class="card-sigil">${options.sigil ?? getCardSigil(card)}</div>
+      <div class="card-hero-copy">
+        <div class="card-hero-label">${label}</div>
+        <div class="card-hero-text">${text}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCardShell(card, content, options = {}) {
+  const classes = [
+    "card",
+    "card-face",
+    getCardThemeClass(card),
+    getCardArtPath(card) ? "card-illustrated" : "card-unillustrated",
+    options.extraClass,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `
+    <article class="${classes}">
+      <div class="card-shell">
+        ${content}
+      </div>
+    </article>
+  `;
+}
+
+function renderHiddenCardShell(card) {
+  return `
+    <article class="card card-back">
+      <div class="card-shell">
+        <div class="card-topline">
+          <span class="card-ribbon">AI 手牌</span>
+          <span class="card-ribbon card-ribbon-strong">${card.category}</span>
+        </div>
+        <div class="card-hero card-hero-back">
+          <div class="card-sigil">BIO</div>
+          <div class="card-hero-copy">
+            <div class="card-hero-label">Unknown</div>
+            <div class="card-hero-text">對手尚未公開這張牌。</div>
+          </div>
+        </div>
+        <div class="card-copy">背面只保留牌型資訊，等待對手實際打出。</div>
+      </div>
+    </article>
+  `;
+}
+
 function renderBattleCard(card, isPlayer) {
+  const canAttack = canUnitAttack(card);
+  const discardDisabled = state.activeSide !== "player" || state.winner || state.players.player.cancerCountdown > 0;
+  const attackStatusBadge = card.attackUsedThisTurn
+    ? '<span class="badge">已攻擊</span>'
+    : canAttack
+      ? '<span class="badge">可攻擊</span>'
+      : '<span class="badge">待機</span>';
   const badges = [
     `<span class="badge badge-accent">${card.tier}</span>`,
-    card.ready ? '<span class="badge">可攻擊</span>' : '<span class="badge">待機</span>',
+    attackStatusBadge,
     card.canBypassFrontline ? '<span class="badge badge-danger">直擊</span>' : "",
     card.shield > 0 ? `<span class="badge badge-accent">護盾 ${card.shield}</span>` : "",
+    card.mutationDamage > 0 ? `<span class="badge badge-danger">突變 ${card.mutationDamage}</span>` : "",
     card.blockedEvolution > 0 ? `<span class="badge badge-danger">封鎖 ${card.blockedEvolution}</span>` : "",
     card.stunnedTurns > 0 ? `<span class="badge badge-danger">阻斷 ${card.stunnedTurns}</span>` : "",
   ]
     .filter(Boolean)
     .join("");
 
-  return `
-    <article class="card">
+  return renderCardShell(
+    card,
+    `
+      ${renderCardTopline(card, { rightText: "戰場" })}
+      ${renderCardVisual(card, { text: card.tags.length ? `標籤：${card.tags.join(" / ")}` : getCardHeroText(card) })}
       <div class="card-header">
         <div>
           <div class="card-name">${card.name}</div>
@@ -2061,24 +2459,29 @@ function renderBattleCard(card, isPlayer) {
         <span>攻擊 ${card.attack}</span>
         <span>生命 ${card.health} / ${card.maxHealth}</span>
       </div>
-      ${card.tags.length ? `<div class="card-meta">標籤：${card.tags.join("、")}</div>` : ""}
+      ${card.tags.length ? `<div class="card-copy">標籤：${card.tags.join("、")}</div>` : '<div class="card-copy">這張單位會在戰場上參與戰鬥與升階。</div>'}
       <div class="card-actions">
         ${
           isPlayer
             ? `
-              <button class="tiny-button" data-action="attack" data-card-id="${card.id}" ${state.activeSide !== "player" || !card.ready || state.winner ? "disabled" : ""}>攻擊</button>
-              <button class="tiny-button" data-action="discard-battle-card" data-card-id="${card.id}" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>丟棄</button>
+              <button class="tiny-button" data-action="attack" data-card-id="${card.id}" ${state.activeSide !== "player" || !canAttack || state.winner ? "disabled" : ""}>攻擊</button>
+              <button class="tiny-button" data-action="discard-battle-card" data-card-id="${card.id}" ${discardDisabled ? "disabled" : ""}>丟棄</button>
             `
             : ""
         }
       </div>
-    </article>
-  `;
+    `,
+    { extraClass: "card-battle" }
+  );
 }
 
 function renderMaterialCard(card, isPlayer) {
-  return `
-    <article class="card card-material">
+  const discardDisabled = state.activeSide !== "player" || state.winner || state.players.player.cancerCountdown > 0;
+  return renderCardShell(
+    card,
+    `
+      ${renderCardTopline(card, { rightText: "實驗區" })}
+      ${renderCardVisual(card)}
       <div class="card-header">
         <div>
           <div class="card-name">${card.name}</div>
@@ -2088,31 +2491,20 @@ function renderMaterialCard(card, isPlayer) {
       <div class="badge-row">
         <span class="badge">${card.tier}</span>
       </div>
-      <div class="card-meta">${CARD_GUIDE_TEXT[card.name] ?? "可作為進化素材。"}</div>
+      <div class="card-copy">${CARD_GUIDE_TEXT[card.name] ?? "可作為進化素材。"}</div>
       ${
         isPlayer
-          ? `<div class="card-actions"><button class="tiny-button" data-action="discard-lab-card" data-card-id="${card.id}" ${state.activeSide !== "player" || state.winner ? "disabled" : ""}>丟棄</button></div>`
+          ? `<div class="card-actions"><button class="tiny-button" data-action="discard-lab-card" data-card-id="${card.id}" ${discardDisabled ? "disabled" : ""}>丟棄</button></div>`
           : ""
       }
-    </article>
-  `;
+    `,
+    { extraClass: "card-material" }
+  );
 }
 
 function renderHandCard(card, index, isPlayer) {
   if (!isPlayer) {
-    return `
-      <article class="card card-material">
-        <div class="card-header">
-          <div>
-            <div class="card-name">未知手牌</div>
-            <div class="card-meta">${card.category}</div>
-          </div>
-        </div>
-        <div class="badge-row">
-          <span class="badge">${card.tier ?? card.category}</span>
-        </div>
-      </article>
-    `;
+    return renderHiddenCardShell(card);
   }
 
   const playLabel = card.category === "結構" && !card.isBattleCard ? "放入實驗區" : `打出 ${card.cost ?? 0}`;
@@ -2123,8 +2515,11 @@ function renderHandCard(card, index, isPlayer) {
     cannotDirectlyPlay ||
     (card.cost ?? 0) > state.players.player.energy;
 
-  return `
-    <article class="card ${card.isBattleCard ? "" : "card-material"}">
+  return renderCardShell(
+    card,
+    `
+      ${renderCardTopline(card, { showCost: card.category !== "結構" || card.isBattleCard })}
+      ${renderCardVisual(card)}
       <div class="card-header">
         <div>
           <div class="card-name">${card.name}</div>
@@ -2138,15 +2533,16 @@ function renderHandCard(card, index, isPlayer) {
       ${
         card.isBattleCard
           ? `<div class="card-stats"><span>攻擊 ${card.attack}</span><span>生命 ${card.health}</span></div>`
-          : `<div class="card-meta">${CARD_GUIDE_TEXT[card.name] ?? handCardHint(card)}</div>`
+          : `<div class="card-copy">${CARD_GUIDE_TEXT[card.name] ?? handCardHint(card)}</div>`
       }
       <div class="card-actions">
         <button class="tiny-button" data-action="play-card" data-index="${index}" ${disabled ? "disabled" : ""}>
           ${cannotDirectlyPlay ? "需進化" : playLabel}
         </button>
       </div>
-    </article>
-  `;
+    `,
+    { extraClass: card.isBattleCard ? "card-hand-battle" : "card-material" }
+  );
 }
 
 function renderEvolutionPanel(recipes) {
@@ -2237,10 +2633,10 @@ function handCardHint(card) {
   const hints = {
     recover: "把棄牌素材直接拉回實驗區，補節奏比補手牌更快。",
     draw: "補牌加速裝配。",
-    sequencer: "回收缺少的結構，或直接找出關鍵缺件。",
+    sequencer: "優先解除己方戰場上的遺傳性突變，否則再回收缺件。",
     copy: "複製 DNA 或 RNA，優先直接放進實驗區。",
     shield: "保護現有或下一個細胞。",
-    medicine: "增加本體護盾，讓你更有機會拖進中後期。",
+    medicine: "優先治療己方癌症，沒有癌症時才轉成支持療法護盾。",
     cleanse: "移除進化封鎖。",
     crispr: "補出缺件，並解除己方阻斷。",
     antibiotic: "優先打擊特殊卡，也能壓低前線血量。",
@@ -2249,11 +2645,11 @@ function handCardHint(card) {
     pathology: "針對已受傷的戰場單位追加打擊。",
     freeEvolution: "下一次進化不耗能。",
     cellBoost: "下一個細胞帶護盾。",
-    cancer: "封鎖敵方高階單位進化。",
+    cancer: "讓敵方進入 5 回合癌症倒數，期間不能丟棄，最後奪取其最高攻擊單位。",
     flu: "壓低敵方下回合能量。",
-    mutation: "破壞敵方 DNA / RNA 或加稅。",
+    mutation: "讓敵方最高攻擊單位帶上遺傳性突變，每回合掉 1 血。",
     rnai: "讓敵方主力攻擊下降並失去下回合行動。",
-    apoptosis: "處決殘血單位，否則造成 2 傷害。",
+    apoptosis: "本回合攻擊敵方殘血戰場單位時，額外造成 2 點傷害。",
     signalBlock: "讓敵方前線下回合無法攻擊。",
     inflammation: "對敵方全體戰場單位各造成 1 傷害。",
   };
@@ -2277,7 +2673,7 @@ function effectLabel(effect) {
     pathology: "病理",
     freeEvolution: "免耗",
     cellBoost: "培養",
-    cancer: "封鎖",
+    cancer: "癌變",
     flu: "降速",
     mutation: "突變",
     rnai: "靜默",

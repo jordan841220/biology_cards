@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">E. coli</title>
+  <desc id="desc">A rod-shaped E. coli bacterium with waving flagella.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff2e8"/><stop offset="1" stop-color="#d79b65"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <rect x="154" y="142" width="336" height="116" rx="58" fill="#ffe3c8" stroke="#99633b" stroke-width="14"/>
+  <g stroke="#99633b" stroke-linecap="round" stroke-width="10" fill="none">
+    <path d="M176 152c-42-34-76-58-108-74"/><path d="M150 198c-44 0-84-10-118-26"/><path d="M176 248c-38 36-62 68-86 112"/>
+    <path d="M472 152c42-34 76-58 108-74"/><path d="M490 198c44 0 84-10 118-26"/><path d="M468 248c38 36 62 68 86 112"/>
+  </g>
+  <g fill="#b77b48" opacity=".62"><circle cx="246" cy="198" r="18"/><circle cx="318" cy="198" r="24"/><circle cx="394" cy="198" r="18"/></g>
+</svg>

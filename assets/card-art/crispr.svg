@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">CRISPR</title>
+  <desc id="desc">Gene editing scissors cutting across a DNA helix.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef7ff"/><stop offset="1" stop-color="#7da2d0"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="none" stroke-linecap="round" stroke-width="12">
+    <path d="M198 90c62 42 62 88 0 132s-62 90 0 134" stroke="#336a93"/>
+    <path d="M440 90c-62 42-62 88 0 132s62 90 0 134" stroke="#93435f"/>
+    <path d="M228 116h182"/><path d="M206 162h226"/><path d="M200 208h238"/><path d="M206 254h226"/><path d="M228 300h182"/>
+  </g>
+  <g fill="#ffffff" stroke="#294b6d" stroke-width="12">
+    <circle cx="274" cy="196" r="28"/><circle cx="366" cy="196" r="28"/>
+  </g>
+  <g fill="none" stroke="#294b6d" stroke-linecap="round" stroke-width="16">
+    <path d="M294 214l72 72"/><path d="M346 214l-72 72"/>
+  </g>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Cardiomyocyte</title>
+  <desc id="desc">A contractile heart muscle cell with striped fibers and a pulse line.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff1ef"/><stop offset="1" stop-color="#dd8a7c"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <rect x="108" y="142" width="424" height="124" rx="60" fill="#ffd9d3" stroke="#a55247" stroke-width="14"/>
+  <g stroke="#b95f53" stroke-width="10">
+    <path d="M156 154v100"/><path d="M198 154v100"/><path d="M240 154v100"/><path d="M282 154v100"/><path d="M324 154v100"/><path d="M366 154v100"/><path d="M408 154v100"/><path d="M450 154v100"/><path d="M492 154v100"/>
+  </g>
+  <path d="M74 318h112l28-40 36 68 58-126 48 88 30-32h180" fill="none" stroke="#8e3936" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+</svg>

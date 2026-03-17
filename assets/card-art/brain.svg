@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Brain</title>
+  <desc id="desc">A glowing brain silhouette with neural arcs and synaptic sparks.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f4f2ff"/><stop offset="1" stop-color="#b2a4d8"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <path d="M210 286c-46 0-76-34-76-74 0-30 18-56 44-68-2-46 34-84 80-84 24 0 48 10 64 28 20-14 42-20 66-20 64 0 112 46 112 106 0 32-14 58-38 74 4 50-36 92-92 92-24 0-46-8-66-24-18 16-48 24-94 24z" fill="#fdfcff" stroke="#66559c" stroke-width="14"/>
+  <g fill="none" stroke="#7f6dbc" stroke-linecap="round" stroke-width="10" opacity=".9">
+    <path d="M236 150c42-18 84-16 124 8"/><path d="M214 214c42-26 94-30 150-10"/><path d="M254 270c50 14 102 10 148-16"/><path d="M348 122c42 18 74 50 88 94"/>
+  </g>
+  <g fill="#ffffff"><circle cx="224" cy="118" r="8"/><circle cx="448" cy="164" r="8"/><circle cx="398" cy="268" r="8"/></g>
+</svg>

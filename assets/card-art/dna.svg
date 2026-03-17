@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">DNA</title>
+  <desc id="desc">A luminous double helix with paired base connections.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef7fb"/><stop offset="1" stop-color="#8bb7d6"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="none" stroke-linecap="round" stroke-width="14">
+    <path d="M224 56c82 56 82 112 0 168s-82 112 0 168" stroke="#2f6789"/>
+    <path d="M416 56c-82 56-82 112 0 168s82 112 0 168" stroke="#7a3f6e"/>
+    <path d="M252 84h136" stroke="#ffffff"/><path d="M230 126h180" stroke="#fff2d5"/>
+    <path d="M220 168h200" stroke="#dff6ff"/><path d="M232 210h176" stroke="#ffe1f1"/>
+    <path d="M252 252h136" stroke="#ffffff"/><path d="M230 294h180" stroke="#fff2d5"/>
+  </g>
+  <g fill="#ffffff" opacity=".38"><circle cx="108" cy="80" r="52"/><circle cx="540" cy="312" r="86"/></g>
+</svg>

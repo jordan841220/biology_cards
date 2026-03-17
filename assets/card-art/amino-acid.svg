@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Amino Acid</title>
+  <desc id="desc">A chain of glowing amino acid spheres joined by peptide bonds.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff1d4"/><stop offset="1" stop-color="#f4c182"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="none" stroke="#7a4e1f" stroke-linecap="round" stroke-width="18" opacity=".8">
+    <path d="M112 234c44-46 96-72 142-56 26 8 44 28 78 28 42 0 54-34 92-42 36-8 70 14 104 50"/>
+  </g>
+  <g>
+    <circle cx="118" cy="234" r="44" fill="#fefcf7"/><circle cx="118" cy="234" r="18" fill="#c87b36"/>
+    <circle cx="214" cy="182" r="38" fill="#fff8ea"/><circle cx="214" cy="182" r="15" fill="#dd9250"/>
+    <circle cx="324" cy="214" r="50" fill="#fff9ef"/><circle cx="324" cy="214" r="18" fill="#b85e3a"/>
+    <circle cx="430" cy="176" r="42" fill="#fff8ea"/><circle cx="430" cy="176" r="16" fill="#d89641"/>
+    <circle cx="530" cy="224" r="46" fill="#fffdf8"/><circle cx="530" cy="224" r="18" fill="#bf6d31"/>
+  </g>
+  <g fill="#ffffff" opacity=".48">
+    <circle cx="154" cy="104" r="68"/><circle cx="530" cy="90" r="58"/><circle cx="478" cy="316" r="84"/>
+  </g>
+</svg>

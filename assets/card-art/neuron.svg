@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Neuron</title>
+  <desc id="desc">A neuron with radiating dendrites and an axon carrying an electric pulse.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f5f4ff"/><stop offset="1" stop-color="#9a8bd1"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="none" stroke="#5d4a9a" stroke-linecap="round" stroke-width="12">
+    <path d="M226 198c-80-66-110-98-126-138"/><path d="M236 216c-92 18-146 46-178 88"/><path d="M252 168c-20-74-24-118-8-148"/>
+    <path d="M316 206h248"/><path d="M438 206c18-10 30-24 38-42"/><path d="M488 206c20 14 32 28 40 50"/><path d="M534 206c26-6 42-12 58-26"/>
+  </g>
+  <circle cx="278" cy="198" r="62" fill="#fffefc" stroke="#5d4a9a" stroke-width="12"/>
+  <circle cx="278" cy="198" r="24" fill="#7a67c0"/>
+  <g fill="#fff7ff" opacity=".84"><circle cx="384" cy="206" r="14"/><circle cx="430" cy="206" r="14"/><circle cx="476" cy="206" r="14"/></g>
+</svg>

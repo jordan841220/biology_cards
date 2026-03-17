@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Phospholipid</title>
+  <desc id="desc">Two phospholipid molecules with rounded heads and flowing tails.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#e5f7f7"/><stop offset="1" stop-color="#87d1c8"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g transform="translate(0 -12)">
+    <circle cx="216" cy="118" r="54" fill="#fefefe"/><circle cx="216" cy="118" r="20" fill="#2f7d72"/>
+    <path d="M196 166c-18 36-16 84 6 150" fill="none" stroke="#287066" stroke-linecap="round" stroke-width="18"/>
+    <path d="M236 166c-4 42 14 86 52 146" fill="none" stroke="#3ca497" stroke-linecap="round" stroke-width="18"/>
+    <circle cx="414" cy="146" r="60" fill="#fffefc"/><circle cx="414" cy="146" r="24" fill="#2c9e8d"/>
+    <path d="M392 202c-34 34-56 76-60 128" fill="none" stroke="#2d746c" stroke-linecap="round" stroke-width="20"/>
+    <path d="M438 202c12 42 38 84 88 126" fill="none" stroke="#50b5a8" stroke-linecap="round" stroke-width="20"/>
+  </g>
+  <g fill="#ffffff" opacity=".4">
+    <circle cx="128" cy="314" r="72"/><circle cx="540" cy="82" r="56"/><circle cx="514" cy="298" r="84"/>
+  </g>
+</svg>

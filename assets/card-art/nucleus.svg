@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Nucleus</title>
+  <desc id="desc">A cell nucleus with chromatin loops and a glowing nucleolus.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f1f0ff"/><stop offset="1" stop-color="#998fc8"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <circle cx="320" cy="200" r="126" fill="#faf8ff" stroke="#60538f" stroke-width="14"/>
+  <circle cx="320" cy="200" r="44" fill="#8572be"/>
+  <g fill="none" stroke="#6d5ca1" stroke-linecap="round" stroke-width="10" opacity=".84">
+    <path d="M250 158c16-42 66-58 110-34"/><path d="M264 234c42 28 92 30 126-2"/>
+    <path d="M220 206c34-26 74-34 118-26"/><path d="M316 118c42 12 74 34 92 78"/>
+    <path d="M386 238c-12-38-40-66-80-78"/>
+  </g>
+  <g fill="#ffffff" opacity=".32"><circle cx="124" cy="96" r="64"/><circle cx="520" cy="294" r="88"/></g>
+</svg>
