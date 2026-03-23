@@ -5,6 +5,8 @@ const DNA_BASES = new Set([
   "鳥糞嘌呤(G)",
 ]);
 
+const FRONTEND_ASSET_VERSION = "v1-svg-fix-20260317";
+
 const TIER_ORDER = {
   基礎分子: 0,
   分子: 1,
@@ -2350,8 +2352,19 @@ function renderCardTopline(card, options = {}) {
   `;
 }
 
+function resolveAssetUrl(path) {
+  const versionedPath = path.includes("?") ? `${path}&v=${FRONTEND_ASSET_VERSION}` : `${path}?v=${FRONTEND_ASSET_VERSION}`;
+
+  if (typeof window !== "undefined" && window.location && typeof URL !== "undefined") {
+    return new URL(versionedPath, window.location.href).toString();
+  }
+
+  return versionedPath;
+}
+
 function getCardArtPath(card) {
-  return CARD_ART_MAP[card.name] ?? null;
+  const path = CARD_ART_MAP[card.name];
+  return path ? resolveAssetUrl(path) : null;
 }
 
 function renderCardVisual(card, options = {}) {
