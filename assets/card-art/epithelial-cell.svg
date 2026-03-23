@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Epithelial Cell</title>
+  <desc id="desc">A clean protective epithelial cell at the surface of a layered tissue.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef9ef"/><stop offset="1" stop-color="#91c58b"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <path d="M72 286h496" stroke="#7cb27a" stroke-linecap="round" stroke-width="20"/>
+  <g fill="#fffefc" stroke="#4f8b52" stroke-width="10">
+    <rect x="120" y="124" width="112" height="144" rx="32"/><rect x="236" y="110" width="122" height="158" rx="34"/><rect x="364" y="120" width="116" height="148" rx="32"/>
+  </g>
+  <g fill="#82b484"><circle cx="176" cy="194" r="20"/><circle cx="298" cy="188" r="24"/><circle cx="422" cy="194" r="20"/></g>
+  <g fill="#ffffff" opacity=".3"><circle cx="512" cy="96" r="68"/><circle cx="108" cy="92" r="56"/></g>
+</svg>

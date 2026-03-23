@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Neural Tissue</title>
+  <desc id="desc">A dense network of neurons linked into a tissue web.</desc>
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f5f3ff"/><stop offset="1" stop-color="#afa0d7"/></linearGradient></defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="none" stroke="#6856a8" stroke-linecap="round" stroke-width="8">
+    <path d="M170 138c74 18 122 60 152 114"/><path d="M470 126c-86 34-132 78-148 126"/><path d="M184 290c88-34 144-48 250-40"/>
+  </g>
+  <g fill="#fffefe" stroke="#6856a8" stroke-width="10">
+    <circle cx="170" cy="136" r="34"/><circle cx="470" cy="126" r="34"/><circle cx="184" cy="290" r="34"/><circle cx="330" cy="228" r="48"/>
+  </g>
+  <g fill="#8d79cf"><circle cx="170" cy="136" r="14"/><circle cx="470" cy="126" r="14"/><circle cx="184" cy="290" r="14"/><circle cx="330" cy="228" r="18"/></g>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Influenza Virus</title>
+  <desc id="desc">A spiked influenza virus particle drifting through the air.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef8fb"/><stop offset="1" stop-color="#97bfd0"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g transform="translate(320 200)">
+    <circle r="92" fill="#fefefe" stroke="#8e4a46" stroke-width="14"/>
+    <g fill="none" stroke="#8e4a46" stroke-linecap="round" stroke-width="10">
+      <path d="M0-146v34"/><path d="M104-104l-24 24"/><path d="M146 0h-34"/><path d="M104 104l-24-24"/><path d="M0 146v-34"/><path d="M-104 104l24-24"/><path d="M-146 0h34"/><path d="M-104 -104l24 24"/>
+      <path d="M60-134l-12 30"/><path d="M134-60l-30 12"/><path d="M134 60l-30-12"/><path d="M60 134l-12-30"/><path d="M-60 134l12-30"/><path d="M-134 60l30-12"/><path d="M-134 -60l30 12"/><path d="M-60 -134l12 30"/>
+    </g>
+    <g fill="#c85c55">
+      <circle cy="-146" r="10"/><circle cx="104" cy="-104" r="10"/><circle cx="146" r="10"/><circle cx="104" cy="104" r="10"/>
+      <circle cy="146" r="10"/><circle cx="-104" cy="104" r="10"/><circle cx="-146" r="10"/><circle cx="-104" cy="-104" r="10"/>
+    </g>
+    <circle r="26" fill="#e79d97"/>
+  </g>
+</svg>

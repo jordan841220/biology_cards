@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Heart</title>
+  <desc id="desc">A stylized anatomical heart with an electrocardiogram pulse.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff1ef"/><stop offset="1" stop-color="#ce7b74"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <path d="M322 314c-102-54-154-126-154-188 0-42 30-70 72-70 34 0 58 18 82 52 20-34 48-52 82-52 44 0 76 28 76 74 0 66-58 136-158 184z" fill="#b64545"/>
+  <path d="M314 88c-6 34-22 64-50 88" fill="none" stroke="#8b2f31" stroke-linecap="round" stroke-width="12"/>
+  <path d="M78 310h126l24-44 34 78 58-136 48 88 30-30h164" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+</svg>

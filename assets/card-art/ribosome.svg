@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Ribosome</title>
+  <desc id="desc">A ribosome with two subunits translating an mRNA ribbon.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eef7ff"/><stop offset="1" stop-color="#8daed4"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <ellipse cx="320" cy="214" rx="168" ry="92" fill="#fefefe" stroke="#4d6e96" stroke-width="12"/>
+  <ellipse cx="320" cy="154" rx="116" ry="66" fill="#dce8f6" stroke="#4d6e96" stroke-width="12"/>
+  <path d="M90 244c112-20 230 54 462-6" fill="none" stroke="#a13f6e" stroke-linecap="round" stroke-width="18"/>
+  <g fill="#5b84b0" opacity=".56"><circle cx="252" cy="198" r="22"/><circle cx="320" cy="226" r="18"/><circle cx="384" cy="202" r="24"/></g>
+  <g fill="#ffffff" opacity=".34"><circle cx="140" cy="104" r="64"/><circle cx="526" cy="308" r="84"/></g>
+</svg>

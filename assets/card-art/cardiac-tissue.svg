@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Cardiac Tissue</title>
+  <desc id="desc">Bundles of aligned cardiac fibers pulsing together.</desc>
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff3f0"/><stop offset="1" stop-color="#cf8a7d"/></linearGradient></defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g fill="#ffe1dd" stroke="#9c564d" stroke-width="10">
+    <rect x="116" y="110" width="408" height="54" rx="24"/><rect x="94" y="176" width="430" height="54" rx="24"/><rect x="122" y="242" width="390" height="54" rx="24"/>
+  </g>
+  <g stroke="#b5665b" stroke-width="8"><path d="M154 118v38"/><path d="M202 118v38"/><path d="M250 118v38"/><path d="M298 118v38"/><path d="M346 118v38"/><path d="M394 118v38"/><path d="M442 118v38"/><path d="M490 118v38"/></g>
+  <path d="M82 326h120l26-34 32 54 42-100 40 66 30-28h186" fill="none" stroke="#8c3836" stroke-linecap="round" stroke-linejoin="round" stroke-width="14"/>
+</svg>

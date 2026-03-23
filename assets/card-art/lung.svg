@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Lung</title>
+  <desc id="desc">A pair of lungs with branching bronchi and soft air sacs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f1fbff"/><stop offset="1" stop-color="#93cad8"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <path d="M312 72h16v86c0 18-14 32-32 32h-10c-44 0-80 36-80 80v40c0 12-10 22-22 22-54 0-88-40-88-114 0-56 24-112 58-144 24-22 54-34 84-34h74z" fill="#f8c7c2"/>
+  <path d="M328 72h-16v86c0 18 14 32 32 32h10c44 0 80 36 80 80v40c0 12 10 22 22 22 54 0 88-40 88-114 0-56-24-112-58-144-24-22-54-34-84-34h-74z" fill="#f6b8b5"/>
+  <g fill="none" stroke="#8c5b57" stroke-linecap="round" stroke-width="12">
+    <path d="M320 86v140"/><path d="M320 150c-42 6-74 24-96 54"/><path d="M320 150c42 6 74 24 96 54"/>
+    <path d="M266 202c-26 10-44 28-56 58"/><path d="M374 202c26 10 44 28 56 58"/>
+  </g>
+</svg>

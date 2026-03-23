@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Cell Membrane</title>
+  <desc id="desc">A stylized lipid bilayer with a membrane channel crossing through it.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#eefcf7"/><stop offset="1" stop-color="#8bc89a"/></linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="36" fill="url(#bg)"/>
+  <g transform="translate(0 12)">
+    <g fill="#ffffff" stroke="#3e7c55" stroke-width="8">
+      <circle cx="112" cy="126" r="20"/><circle cx="176" cy="126" r="20"/><circle cx="240" cy="126" r="20"/><circle cx="304" cy="126" r="20"/><circle cx="368" cy="126" r="20"/><circle cx="432" cy="126" r="20"/><circle cx="496" cy="126" r="20"/>
+      <circle cx="112" cy="274" r="20"/><circle cx="176" cy="274" r="20"/><circle cx="240" cy="274" r="20"/><circle cx="304" cy="274" r="20"/><circle cx="368" cy="274" r="20"/><circle cx="432" cy="274" r="20"/><circle cx="496" cy="274" r="20"/>
+    </g>
+    <g stroke="#4a9564" stroke-linecap="round" stroke-width="9">
+      <path d="M112 146v96"/><path d="M176 146v96"/><path d="M240 146v96"/><path d="M304 146v96"/><path d="M368 146v96"/><path d="M432 146v96"/><path d="M496 146v96"/>
+      <path d="M126 146v96"/><path d="M190 146v96"/><path d="M254 146v96"/><path d="M318 146v96"/><path d="M382 146v96"/><path d="M446 146v96"/><path d="M510 146v96"/>
+    </g>
+    <rect x="272" y="102" width="92" height="196" rx="38" fill="#2c6750" opacity=".76"/>
+    <rect x="296" y="124" width="44" height="152" rx="22" fill="#dff8ea"/>
+  </g>
+</svg>
